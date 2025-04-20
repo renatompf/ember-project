@@ -3,6 +3,7 @@ package io.ember.examples.ServiceExample.controller;
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.Get;
 import io.ember.annotations.parameters.PathParameter;
+import io.ember.annotations.parameters.QueryParameter;
 import io.ember.core.ContextHolder;
 import io.ember.examples.ServiceExample.service.UserService;
 
@@ -33,6 +34,12 @@ public class ExampleController {
     @Get("/list")
     public void listAllUsers() {
         ContextHolder.context().response().ok(String.join(", ", userService.listAllUsers()));
+    }
+
+    @Get("/search")
+    public void searchUsers(@QueryParameter("name") String name, @QueryParameter("age") Integer age) {
+        String response = "Searching for users with name: " + name + " and age: " + age;
+        ContextHolder.context().response().ok(response);
     }
 
 }

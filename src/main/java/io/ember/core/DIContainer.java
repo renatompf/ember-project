@@ -4,6 +4,7 @@ import io.ember.EmberApplication;
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.*;
 import io.ember.annotations.parameters.PathParameter;
+import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.service.Service;
 import io.ember.utils.TypeConverter;
 
@@ -211,40 +212,50 @@ public class DIContainer {
      */
     public Object invokeControllerMethod(Object controller, Method method, Context context) {
         try {
-            // Retrieve method parameters and initialize argument array
             Parameter[] parameters = method.getParameters();
             Object[] args = new Object[parameters.length];
-            Map<String, String> params = context.pathParams().pathParams();
+            Map<String, String> queryParams = context.queryParams().queryParams();
+            Map<String, String> pathParams = context.pathParams().pathParams();
 
-            // Resolve each parameter
             for (int i = 0; i < parameters.length; i++) {
                 Parameter parameter = parameters[i];
+
+                // Handle @PathParam
                 PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
-
                 if (pathParam != null) {
-                    // Handle path parameters
                     String paramName = pathParam.value();
-                    String paramValue = params.get(paramName);
-
+                    String paramValue = pathParams.get(paramName);
                     if (paramValue == null) {
                         throw new IllegalArgumentException("Missing path parameter: " + paramName);
                     }
-
-                    // Convert the parameter value to the required type
                     args[i] = TypeConverter.convert(paramValue, parameter.getType());
-                } else if (parameter.getType().isAssignableFrom(Context.class)) {
-                    // Pass the Context object if required
-                    args[i] = context;
-                } else {
-                    // Handle other cases (e.g., unsupported parameter types)
-                    args[i] = null;
+                    continue;
                 }
+
+                // Handle @QueryParameter
+                QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
+                if (queryParam != null) {
+                    String paramName = queryParam.value();
+                    String paramValue = queryParams.get(paramName);
+                    if (paramValue == null) {
+                        throw new IllegalArgumentException("Missing query parameter: " + paramName);
+                    }
+                    args[i] = TypeConverter.convert(paramValue, parameter.getType());
+                    continue;
+                }
+
+                // Handle Context
+                if (parameter.getType().isAssignableFrom(Context.class)) {
+                    args[i] = context;
+                    continue;
+                }
+
+                // Default to null for unsupported parameters
+                args[i] = null;
             }
 
-            // Invoke the method with resolved arguments
             return method.invoke(controller, args);
         } catch (Exception e) {
-            // Wrap and rethrow exceptions as runtime exceptions
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
         }
     }

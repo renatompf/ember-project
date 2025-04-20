@@ -60,4 +60,14 @@ public class QueryParameterManager {
     public String queryParam(String key) {
         return queryParams.get(key);
     }
+
+    /**
+     * Retrieves all query parameters as a map.
+     *
+     * @return A map containing all query parameters.
+     */
+    public Map<String, String> queryParams() {
+        return queryParams;
+    }
+
 }
