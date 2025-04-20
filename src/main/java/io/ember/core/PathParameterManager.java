@@ -53,4 +53,13 @@ public class PathParameterManager {
     public void setPathParams(Map<String, String> pathParams) {
         this.pathParams = pathParams;
     }
+
+    /**
+     * Retrieves the path parameters.
+     *
+     * @return A map of path parameter names to their values.
+     */
+    public Map<String, String> pathParams() {
+        return pathParams;
+    }
 }

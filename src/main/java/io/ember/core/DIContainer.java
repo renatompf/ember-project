@@ -3,13 +3,16 @@ package io.ember.core;
 import io.ember.EmberApplication;
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.*;
+import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.service.Service;
+import io.ember.utils.TypeConverter;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.*;
 
 /**
@@ -199,17 +202,56 @@ public class DIContainer {
      *
      * @param controller The controller instance.
      * @param method     The method to invoke.
-     * @param ctx        The context to pass to the method.
+     * @param context        The context to pass to the method.
+     */
+    /**
+     * Invokes a controller method with the provided context.
+     * This method resolves method parameters, including path parameters
+     * and the `Context` object, and invokes the controller method.
+     *
+     * @param controller The controller instance containing the method.
+     * @param method     The method to invoke.
+     * @param context    The HTTP request context to pass to the method.
+     * @return The result of the invoked method.
+     * @throws IllegalArgumentException If a required path parameter is missing.
+     * @throws RuntimeException         If the method invocation fails.
      */
     public Object invokeControllerMethod(Object controller, Method method, Context context) {
         try {
-            Class<?>[] paramTypes = method.getParameterTypes();
-            if (paramTypes.length == 0) {
-                return method.invoke(controller);
-            } else {
-                return method.invoke(controller, context);
+            // Retrieve method parameters and initialize argument array
+            Parameter[] parameters = method.getParameters();
+            Object[] args = new Object[parameters.length];
+            Map<String, String> params = context.pathParams().pathParams();
+
+            // Resolve each parameter
+            for (int i = 0; i < parameters.length; i++) {
+                Parameter parameter = parameters[i];
+                PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
+
+                if (pathParam != null) {
+                    // Handle path parameters
+                    String paramName = pathParam.value();
+                    String paramValue = params.get(paramName);
+
+                    if (paramValue == null) {
+                        throw new IllegalArgumentException("Missing path parameter: " + paramName);
+                    }
+
+                    // Convert the parameter value to the required type
+                    args[i] = TypeConverter.convert(paramValue, parameter.getType());
+                } else if (parameter.getType().isAssignableFrom(Context.class)) {
+                    // Pass the Context object if required
+                    args[i] = context;
+                } else {
+                    // Handle other cases (e.g., unsupported parameter types)
+                    args[i] = null;
+                }
             }
+
+            // Invoke the method with resolved arguments
+            return method.invoke(controller, args);
         } catch (Exception e) {
+            // Wrap and rethrow exceptions as runtime exceptions
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
         }
     }
