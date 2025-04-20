@@ -23,17 +23,35 @@ public class Server {
 
     public Server(Router router, List<Middleware> middleware) {
         this.router = router;
-        this.middleware = middleware;
+        this.middleware = new ArrayList<>(middleware);
+        boolean containsContextMiddleware = middleware
+                .stream()
+                .anyMatch(m -> m instanceof ContextMiddleware);
+        if (!containsContextMiddleware) {
+            this.middleware.add(new ContextMiddleware());
+        }
     }
 
+    /**
+     * Starts the HTTP server on the specified port.
+     * <p>
+     * This method initializes an `HttpServer` instance, sets up a request handler, and starts the server.
+     * It processes incoming HTTP requests by creating a `Context` object, building the middleware chain,
+     * and executing the chain. If an exception occurs during request processing, appropriate HTTP error
+     * responses are sent back to the client.
+     * <p>
+     * The server uses a cached thread pool executor to handle requests asynchronously.
+     *
+     * @param port The port number on which the server will listen for incoming requests.
+     */
     public void start(int port) {
 
         try{
             HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-
             // Setting the custom executor for handling requests asynchronously
             server.setExecutor(Executors.newCachedThreadPool());
 
+            // Setting up the context for handling requests
             server.createContext("/", exchange -> {
                 Context context = new Context(
                         exchange,
@@ -73,6 +91,17 @@ public class Server {
 
     }
 
+    /**
+     * Builds the middleware chain for the given context.
+     *<p>
+     * This method determines the appropriate middleware chain to execute for a given request.
+     * It first retrieves the route match result based on the HTTP method and path of the request.
+     * If a matching route is found, it adds the route-specific middleware and handler to the chain.
+     * If no match is found, it adds a middleware that sends a 404 Not Found response.
+     *<p>
+     * @param context The context for the current request, containing request details and state.
+     * @return A list of middleware to be executed for the request.
+     */
     private List<Middleware> buildMiddlewareChain(Context context) {
         RouteMatchResult match = router.getRoute(context.getMethod(), context.getPath());
 

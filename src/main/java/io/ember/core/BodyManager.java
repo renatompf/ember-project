@@ -22,6 +22,14 @@ public class BodyManager {
         this.contentType = contentType;
     }
 
+    /**
+     * Parses the request body into an object of the specified class type.
+     *
+     * @param <T>   The type of the object to parse the body into.
+     * @param clazz The class type to parse the body into.
+     * @return An instance of the specified class type populated with data from the request body.
+     * @throws HttpException If the content type is unsupported or the body cannot be parsed.
+     */
     public <T> T parseBodyAs(Class<T> clazz) {
         try {
             if (contentType == null || contentType.equals(MediaType.APPLICATION_JSON.getType())) {
