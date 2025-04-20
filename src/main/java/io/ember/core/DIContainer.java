@@ -200,58 +200,25 @@ public class DIContainer {
 
     /**
      * Invokes a controller method with the provided context.
-     * This method resolves method parameters, including path parameters
-     * and the `Context` object, and invokes the controller method.
+     * This method resolves method parameters, including path parameters,
+     * query parameters, and the `Context` object, and invokes the controller method.
      *
-     * @param controller The controller instance containing the method.
-     * @param method     The method to invoke.
-     * @param context    The HTTP request context to pass to the method.
-     * @return The result of the invoked method.
-     * @throws IllegalArgumentException If a required path parameter is missing.
-     * @throws RuntimeException         If the method invocation fails.
+     * @param controller The controller instance containing the method to invoke.
+     * @param method     The method to invoke on the controller.
+     * @param context    The HTTP request context, which provides access to path parameters,
+     *                   query parameters, and other request-related data.
+     * @return The result of the invoked method, or `null` if the method has a `void` return type.
+     * @throws IllegalArgumentException If a required path or query parameter is missing.
+     * @throws RuntimeException         If the method invocation fails or an error occurs during parameter resolution.
      */
     public Object invokeControllerMethod(Object controller, Method method, Context context) {
         try {
             Parameter[] parameters = method.getParameters();
             Object[] args = new Object[parameters.length];
-            Map<String, String> queryParams = context.queryParams().queryParams();
-            Map<String, String> pathParams = context.pathParams().pathParams();
 
             for (int i = 0; i < parameters.length; i++) {
                 Parameter parameter = parameters[i];
-
-                // Handle @PathParam
-                PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
-                if (pathParam != null) {
-                    String paramName = pathParam.value();
-                    String paramValue = pathParams.get(paramName);
-                    if (paramValue == null) {
-                        throw new IllegalArgumentException("Missing path parameter: " + paramName);
-                    }
-                    args[i] = TypeConverter.convert(paramValue, parameter.getType());
-                    continue;
-                }
-
-                // Handle @QueryParameter
-                QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
-                if (queryParam != null) {
-                    String paramName = queryParam.value();
-                    String paramValue = queryParams.get(paramName);
-                    if (paramValue == null) {
-                        throw new IllegalArgumentException("Missing query parameter: " + paramName);
-                    }
-                    args[i] = TypeConverter.convert(paramValue, parameter.getType());
-                    continue;
-                }
-
-                // Handle Context
-                if (parameter.getType().isAssignableFrom(Context.class)) {
-                    args[i] = context;
-                    continue;
-                }
-
-                // Default to null for unsupported parameters
-                args[i] = null;
+                args[i] = resolveParameter(parameter, context);
             }
 
             return method.invoke(controller, args);
@@ -260,6 +227,71 @@ public class DIContainer {
         }
     }
 
+    /**
+     * Resolves a method parameter based on its annotations and type.
+     * Supports resolving path parameters, query parameters, and the `Context` object.
+     *
+     * @param parameter The method parameter to resolve.
+     * @param context   The HTTP request context, which provides access to path and query parameters.
+     * @return The resolved parameter value, or `null` if the parameter type is unsupported.
+     */
+    private Object resolveParameter(Parameter parameter, Context context) {
+        // Handle path parameters
+        PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
+        if (pathParam != null) {
+            return resolvePathParameter(pathParam, parameter, context.pathParams().pathParams());
+        }
+
+        // Handle query parameters
+        QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
+        if (queryParam != null) {
+            return resolveQueryParameter(queryParam, parameter, context.queryParams().queryParams());
+        }
+
+        // Handle Context parameter
+        if (parameter.getType().isAssignableFrom(Context.class)) {
+            return context;
+        }
+
+        // Default to null for unsupported parameters
+        return null;
+    }
+
+    /**
+     * Resolves a path parameter from the request context.
+     *
+     * @param annotation The `@PathParameter` annotation on the parameter.
+     * @param parameter  The method parameter to resolve.
+     * @param pathParams A map of path parameter names to their values from the request.
+     * @return The resolved path parameter value, converted to the parameter's type.
+     * @throws IllegalArgumentException If the required path parameter is missing.
+     */
+    private Object resolvePathParameter(PathParameter annotation, Parameter parameter, Map<String, String> pathParams) {
+        String paramName = annotation.value();
+        String paramValue = pathParams.get(paramName);
+        if (paramValue == null) {
+            throw new IllegalArgumentException("Missing path parameter: " + paramName);
+        }
+        return TypeConverter.convert(paramValue, parameter.getType());
+    }
+
+    /**
+     * Resolves a query parameter from the request context.
+     *
+     * @param annotation  The `@QueryParameter` annotation on the parameter.
+     * @param parameter   The method parameter to resolve.
+     * @param queryParams A map of query parameter names to their values from the request.
+     * @return The resolved query parameter value, converted to the parameter's type.
+     * @throws IllegalArgumentException If the required query parameter is missing.
+     */
+    private Object resolveQueryParameter(QueryParameter annotation, Parameter parameter, Map<String, String> queryParams) {
+        String paramName = annotation.value();
+        String paramValue = queryParams.get(paramName);
+        if (paramValue == null) {
+            throw new IllegalArgumentException("Missing query parameter: " + paramName);
+        }
+        return TypeConverter.convert(paramValue, parameter.getType());
+    }
     /**
      * Finds all classes annotated with `@Service` in the classpath.
      *
