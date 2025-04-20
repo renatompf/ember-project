@@ -10,32 +10,32 @@ public class Main {
         EmberApplication app = new EmberApplication();
 
         app
-                .get("/ping", ctx -> ctx.ok(Map.of("message", "pong")))
+                .get("/ping", ctx -> ctx.response().ok(Map.of("message", "pong")))
                 .post("/echo", ctx -> {
-                    EchoRequest requestBody = ctx.bodyAs(EchoRequest.class);
-                    ctx.ok(Map.of("received", requestBody));
+                    EchoRequest requestBody = ctx.body().parseBodyAs(EchoRequest.class);
+                    ctx.response().ok(Map.of("received", requestBody));
                 })
                 .get("/hello/:name?", ctx -> {
-                    String name = ctx.pathParam("name");
+                    String name = ctx.pathParams().pathParam("name");
                     String greeting = name == null ? "Hello, World!" : "Hello, " + name + "!";
-                    ctx.ok(Map.of("greeting", greeting));
+                    ctx.response().ok(Map.of("greeting", greeting));
                 })
                 .group("/admin", admin -> {
                     admin
                             .use(ctx -> {
                                 System.out.println("[GROUP] Auth check...");
-                                String token = ctx.queryParam("token");
+                                String token = ctx.queryParams().queryParam("token");
                                 if (!"admin".equals(token)) {
-                                    ctx.forbidden("Forbidden");
+                                    ctx.response().forbidden("Forbidden");
                                 }
                                 ctx.next();
                             })
                             .get("/dashboard", ctx ->
-                                    ctx.ok(Map.of("message", "Welcome to admin dashboard"))
+                                    ctx.response().ok(Map.of("message", "Welcome to admin dashboard"))
                             );
                 })
                 .get("/about", ctx ->
-                        ctx.ok(Map.of("info", "About us"))
+                        ctx.response().ok(Map.of("info", "About us"))
                 );
 
         app.start(8080);

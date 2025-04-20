@@ -20,9 +20,9 @@ public class AuthMiddleware implements Middleware {
     }
 
     public void handle(Context ctx) {
-        String authHeader = ctx.header("Authorization");
+        String authHeader = ctx.headers().header("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            ctx.unauthorized("Unauthorized: Missing or invalid token");
+            ctx.response().unauthorized("Unauthorized: Missing or invalid token");
             return;
         }
 
@@ -37,7 +37,7 @@ public class AuthMiddleware implements Middleware {
 //            System.out.println("Token claims: " + claims);
             ctx.next();
         } catch (Exception e) {
-            ctx.unauthorized("Unauthorized: Invalid token");
+            ctx.response().unauthorized("Unauthorized: Invalid token");
         }
     }
 }

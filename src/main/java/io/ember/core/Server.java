@@ -2,12 +2,18 @@ package io.ember.core;
 
 import com.sun.net.httpserver.HttpServer;
 import io.ember.enums.HttpStatusCode;
+import io.ember.enums.MediaType;
+import io.ember.enums.RequestHeader;
 import io.ember.exceptions.HttpException;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class Server {
@@ -29,7 +35,17 @@ public class Server {
             server.setExecutor(Executors.newCachedThreadPool());
 
             server.createContext("/", exchange -> {
-                Context context = new Context(exchange);
+                Context context = new Context(
+                        exchange,
+                        exchange.getRequestURI().getQuery(),
+                        new BufferedReader(new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8))
+                                .lines()
+                                .reduce("", (acc, line) -> acc + line),
+                        exchange.getRequestHeaders().getFirst(RequestHeader.CONTENT_TYPE.getHeaderName()) != null
+                                ? exchange.getRequestHeaders().getFirst(RequestHeader.CONTENT_TYPE.getHeaderName())
+                                : MediaType.OCTET_STREAM.getType(),
+                        Map.of()
+                );
 
                 context.setMiddlewareChain(buildMiddlewareChain(context));
                 try {
@@ -62,12 +78,12 @@ public class Server {
 
         List<Middleware> fullChain = new ArrayList<>(middleware);
         if(match != null) {
-            context.setPathParams(match.parameters());
+            context.pathParams().setPathParams(match.parameters());
             fullChain.addAll(match.middlewareChain().middleware());
             fullChain.add(c -> match.middlewareChain().handler().accept(c));
         } else {
             fullChain.add(c -> {
-                c.send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
+                c.response().send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
             });
         }
 

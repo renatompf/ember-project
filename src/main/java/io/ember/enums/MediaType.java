@@ -6,7 +6,10 @@ public enum MediaType {
     APPLICATION_FORM_URLENCODED("application/x-www-form-urlencoded"),
     TEXT_PLAIN("text/plain"),
     TEXT_HTML("text/html"),
-    MULTIPART_FORM_DATA("multipart/form-data");
+    MULTIPART_FORM_DATA("multipart/form-data"),
+    OCTET_STREAM("application/octet-stream"),
+
+    ;
 
     private final String type;
 
