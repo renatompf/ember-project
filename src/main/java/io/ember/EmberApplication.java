@@ -16,6 +16,9 @@ public class EmberApplication {
     // Router instance to manage route registrations and matching
     private final Router router = new Router();
 
+    // Dependency Injection container for managing service instances
+    private final DIContainer diContainer = new DIContainer();
+
     // List of global middleware applied to all routes
     private final List<Middleware> middleware = new ArrayList<>();
 
@@ -162,6 +165,24 @@ public class EmberApplication {
      * @param port The port number to start the server on.
      */
     public void start(int port) {
+        // Register all services in the Dependency Injection (DI) container.
+        // This step ensures that all service classes are available for injection.
+        diContainer.registerServices();
+
+        // Register all controllers in the DI container.
+        // Controllers are responsible for handling HTTP requests and defining routes.
+        diContainer.registerControllers();
+
+        // Resolve all services to ensure they are instantiated and their dependencies are satisfied.
+        // This step validates the DI container's configuration.
+        diContainer.resolveAll();
+
+        // Map all routes defined in the controllers to the router.
+        // This step binds the routes to their respective handlers in the application.
+        diContainer.mapControllerRoutes(this);
+
+        // Start the HTTP server on the specified port.
+        // The server will begin listening for incoming requests.
         server.start(port);
     }
 }
