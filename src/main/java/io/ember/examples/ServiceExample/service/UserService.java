@@ -1,8 +1,7 @@
 package io.ember.examples.ServiceExample.service;
 
 import io.ember.annotations.service.Service;
-
-import java.util.List;
+import io.ember.examples.ServiceExample.dto.UserDTO;
 
 @Service
 public class UserService {
@@ -20,8 +19,12 @@ public class UserService {
         return new String[] {"Lisa", "John", "Harry", "Sally"};
     }
 
-    public String createUser(String user) {
-        return "Created user: " + user;
+    public String createUser(UserDTO user) {
+        System.out.println("User name: " + user.name());
+        System.out.println("User age: " + user.age());
+        System.out.println("User email: " + user.email());
+
+        return "Created user: " + user.name() + ", age: " + user.age();
     }
 
     public String updateUser(String id, String user) {

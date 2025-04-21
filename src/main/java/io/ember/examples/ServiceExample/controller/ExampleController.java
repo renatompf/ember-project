@@ -2,10 +2,13 @@ package io.ember.examples.ServiceExample.controller;
 
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.Get;
+import io.ember.annotations.http.Post;
 import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
+import io.ember.annotations.parameters.RequestBody;
 import io.ember.core.ContextHolder;
+import io.ember.examples.ServiceExample.dto.UserDTO;
 import io.ember.examples.ServiceExample.middleware.CustomMiddleware;
 import io.ember.examples.ServiceExample.middleware.GlobalCustomMiddleware;
 import io.ember.examples.ServiceExample.service.UserService;
@@ -47,6 +50,16 @@ public class ExampleController {
     public void searchUsers(@QueryParameter("name") String name, @QueryParameter("age") Integer age) {
         String response = "Searching for users with name: " + name + " and age: " + age;
         ContextHolder.context().response().ok(response);
+    }
+
+    @Post
+    public void createUser(@RequestBody UserDTO body) {
+        if (body == null) {
+            ContextHolder.context().response().badRequest("Body cannot be null");
+            return;
+        }
+        System.out.println("UserDTO: " + body);
+        ContextHolder.context().response().ok(userService.createUser(body));
     }
 
 }

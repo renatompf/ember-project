@@ -6,6 +6,7 @@ import io.ember.annotations.http.*;
 import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
+import io.ember.annotations.parameters.RequestBody;
 import io.ember.annotations.service.Service;
 import io.ember.utils.TypeConverter;
 
@@ -204,6 +205,14 @@ public class DIContainer {
         return base + path;
     }
 
+    /**
+     * Handles the execution of middleware and invokes the corresponding controller method.
+     *
+     * @param controller           The controller instance containing the method to invoke.
+     * @param method               The method to invoke on the controller.
+     * @param context              The HTTP request context, which provides access to request data.
+     * @param controllerMiddleware An array of middleware classes to execute at the controller level.
+     */
     private void handleWithMiddleware(Object controller, Method method, Context context, Class<? extends Middleware>[] controllerMiddleware) {
         try {
             // Collect method-level middleware
@@ -243,7 +252,7 @@ public class DIContainer {
      * @throws IllegalArgumentException If a required path or query parameter is missing.
      * @throws RuntimeException         If the method invocation fails or an error occurs during parameter resolution.
      */
-    public Object invokeControllerMethod(Object controller, Method method, Context context) {
+    private Object invokeControllerMethod(Object controller, Method method, Context context) {
         try {
             Parameter[] parameters = method.getParameters();
             Object[] args = new Object[parameters.length];
@@ -278,6 +287,12 @@ public class DIContainer {
         QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
         if (queryParam != null) {
             return resolveQueryParameter(queryParam, parameter, context.queryParams().queryParams());
+        }
+
+        // Handle request body
+        if (parameter.isAnnotationPresent(RequestBody.class)) {
+            Class<?> type = parameter.getType();
+            return context.body().parseBodyAs(type);
         }
 
         // Handle Context parameter
