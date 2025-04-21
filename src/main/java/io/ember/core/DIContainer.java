@@ -17,6 +17,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The `DIContainer` class is a simple implementation of a Dependency Injection (DI) container.
@@ -24,10 +25,13 @@ import java.util.*;
  */
 public class DIContainer {
     // Map to store registered service classes and their instances
-    private final Map<Class<?>, Object> instances = new HashMap<>();
+    private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
     // ThreadLocal to keep track of resolving classes to prevent circular dependencies
     private final ThreadLocal<Set<Class<?>>> resolving = ThreadLocal.withInitial(HashSet::new);
+
+    // Marker object to indicate that a service is registered but not yet resolved
+    private static final Object UNRESOLVED = new Object();
 
     /**
      * Registers a service class in the container.
@@ -39,7 +43,7 @@ public class DIContainer {
      */
     public <T> void register(Class<T> serviceClass) {
         if (serviceClass.isAnnotationPresent(Service.class) || serviceClass.isAnnotationPresent(Controller.class)) {
-            instances.put(serviceClass, null); // Mark as registered
+            instances.put(serviceClass, UNRESOLVED); // Mark as registered
         } else {
             throw new IllegalArgumentException("Class " + serviceClass.getName() + " is not annotated with @Service");
         }
@@ -90,51 +94,57 @@ public class DIContainer {
 
     /**
      * Resolves a specific service class by creating an instance and injecting its dependencies.
+     * This method ensures that circular dependencies are prevented and that only one instance
+     * of the service is created.
      *
-     * @param serviceClass The service class to resolve.
      * @param <T>          The type of the service class.
+     * @param serviceClass The service class to resolve.
      * @return The resolved instance of the service class.
      * @throws IllegalStateException if the service is not registered, has circular dependencies,
      *                               or has more than one public constructor.
      * @throws RuntimeException      if an error occurs during service instantiation.
      */
+    @SuppressWarnings("unchecked")
     public <T> T resolve(Class<T> serviceClass) {
-        if (!instances.containsKey(serviceClass)) {
-            throw new IllegalStateException("No service registered for: " + serviceClass.getName());
+        Object instance = instances.get(serviceClass);
+        if (instance != null && instance != UNRESOLVED) {
+            return (T) instance;
         }
 
-        if (instances.get(serviceClass) != null) {
-            return serviceClass.cast(instances.get(serviceClass));
-        }
-
+        // Prevent circular dependencies
         if (resolving.get().contains(serviceClass)) {
             throw new IllegalStateException("Circular dependency detected for: " + serviceClass.getName());
         }
 
         resolving.get().add(serviceClass);
         try {
-            Constructor<?>[] constructors = serviceClass.getConstructors();
-            if (constructors.length != 1) {
-                throw new IllegalStateException("Service must have exactly one public constructor: " + serviceClass.getName());
-            }
+            // Use computeIfAbsent to ensure only one thread creates the instance
+            return (T) instances.computeIfPresent(serviceClass, (cls, existing) -> {
+                if (existing != UNRESOLVED) {
+                    return existing;
+                }
 
-            Constructor<?> constructor = constructors[0];
-            Class<?>[] parameterTypes = constructor.getParameterTypes();
-            Object[] parameters = new Object[parameterTypes.length];
+                try {
+                    Constructor<?>[] constructors = cls.getConstructors();
+                    if (constructors.length != 1) {
+                        throw new IllegalStateException("Service must have exactly one public constructor: " + cls.getName());
+                    }
 
-            for (int i = 0; i < parameterTypes.length; i++) {
-                parameters[i] = resolve(parameterTypes[i]);
-            }
+                    Constructor<?> constructor = constructors[0];
+                    Object[] parameters = Arrays.stream(constructor.getParameterTypes())
+                            .map(this::resolve)
+                            .toArray();
 
-            T instance = serviceClass.cast(constructor.newInstance(parameters));
-            instances.put(serviceClass, instance);
-            return instance;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to resolve service: " + serviceClass.getName(), e);
+                    return constructor.newInstance(parameters);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to resolve service: " + cls.getName(), e);
+                }
+            });
         } finally {
             resolving.get().remove(serviceClass);
         }
     }
+
 
     /**
      * Maps controller routes to the Ember application.
