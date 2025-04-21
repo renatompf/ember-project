@@ -55,17 +55,6 @@ Ember Framework is a lightweight Java web framework designed for building RESTfu
 ```
 
 
-## Installation
-To use Ember Framework in your project, add the following Maven dependency to your `pom.xml`:
-
-```xml
-<dependency>
-    <groupId>io.ember</groupId>
-    <artifactId>ember-framework</artifactId>
-    <version>1.0.0</version>
-</dependency>
-```
-
 ## Getting Started
 
 ### 1. Define a Controller
