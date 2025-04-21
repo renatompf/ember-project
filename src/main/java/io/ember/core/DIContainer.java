@@ -17,7 +17,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The `DIContainer` class is a simple implementation of a Dependency Injection (DI) container.
@@ -25,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DIContainer {
     // Map to store registered service classes and their instances
-    private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Object> instances = new HashMap<>();
 
     // ThreadLocal to keep track of resolving classes to prevent circular dependencies
     private final ThreadLocal<Set<Class<?>>> resolving = ThreadLocal.withInitial(HashSet::new);
@@ -263,9 +262,31 @@ public class DIContainer {
                 args[i] = resolveParameter(parameter, context);
             }
 
-            return method.invoke(controller, args);
+            Object result = method.invoke(controller, args);
+            handleControllerResult(result, context);
+            return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
+        }
+    }
+
+    /**
+     * Handles the result of a controller method invocation and sends the appropriate HTTP response.
+     * <p>
+     * If the result is an instance of `Response`, it sends the response body and status code.
+     * If the result is not null, it sends the result's string representation with a 200 status code.
+     * If the result is null, it sends an empty response with a 204 status code.
+     *
+     * @param result  The result of the controller method invocation.
+     * @param context The HTTP request context used to send the response.
+     */
+    private void handleControllerResult(Object result, Context context) {
+        if (result instanceof Response response) {
+            context.response().sendJson(response.body(), response.statusCode());
+        } else if (result != null) {
+            context.response().sendJson(result.toString(), 200);
+        } else {
+            context.response().sendJson("", 204);
         }
     }
 

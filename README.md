@@ -66,13 +66,14 @@ package io.ember.examples;
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.Get;
 import io.ember.core.ContextHolder;
+import io.ember.core.Response;
 
 @Controller("/example")
 public class ExampleController {
 
     @Get("/hello")
-    public void sayHello() {
-        ContextHolder.context().response().ok("Hello, World!");
+    public Response sayHello() {
+        return Response.ok("Hello, World!");
     }
 }
 ```

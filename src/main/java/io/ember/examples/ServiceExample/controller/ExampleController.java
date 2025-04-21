@@ -7,11 +7,14 @@ import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.parameters.RequestBody;
-import io.ember.core.ContextHolder;
+import io.ember.core.Response;
 import io.ember.examples.ServiceExample.dto.UserDTO;
 import io.ember.examples.ServiceExample.middleware.CustomMiddleware;
 import io.ember.examples.ServiceExample.middleware.GlobalCustomMiddleware;
 import io.ember.examples.ServiceExample.service.UserService;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Controller("/example")
 @WithMiddleware({
@@ -27,44 +30,47 @@ public class ExampleController {
 
     @Get("/get")
     @WithMiddleware(CustomMiddleware.class)
-    public void getUser() {
-        ContextHolder.context().response().ok(userService.getUser());
+    public Response getUser() {
+        return Response.ok(userService.getUser());
     }
 
     @Get("/user/:id")
-    public void getUserById(@PathParameter("id") Integer id) {
+    public Response getUserById(@PathParameter("id") Integer id) {
         if (id == null) {
-            ContextHolder.context().response().badRequest("ID cannot be null");
-            return;
+            return Response.badRequest("ID cannot be null");
         }
+
         System.out.println("ID: " + id);
-        ContextHolder.context().response().ok(userService.getUserById(id));
+        return Response.ok(userService.getUserById(id));
     }
 
     @Get("/:id?")
-    public void getUserByIdOptional(@PathParameter("id") Integer id) {
-        ContextHolder.context().response().ok(userService.getUserById(id));
+    public Response getUserByIdOptional(@PathParameter("id") Integer id) {
+        return Response.ok(userService.getUserById(id));
     }
 
     @Get("/list")
-    public void listAllUsers() {
-        ContextHolder.context().response().ok(String.join(", ", userService.listAllUsers()));
+    public Response listAllUsers() {
+        return Response.ok(Arrays.stream(userService.listAllUsers()).collect(
+                Collectors.toMap(
+                        user -> user,
+                        String::length
+        )));
     }
 
     @Get("/search")
-    public void searchUsers(@QueryParameter("name") String name, @QueryParameter("age") Integer age) {
+    public Response searchUsers(@QueryParameter("name") String name, @QueryParameter("age") Integer age) {
         String response = "Searching for users with name: " + name + " and age: " + age;
-        ContextHolder.context().response().ok(response);
+        return Response.ok(response);
     }
 
     @Post
-    public void createUser(@RequestBody UserDTO body) {
+    public Response createUser(@RequestBody UserDTO body) {
         if (body == null) {
-            ContextHolder.context().response().badRequest("Body cannot be null");
-            return;
+            return Response.badRequest("Body cannot be null");
         }
-        System.out.println("UserDTO: " + body);
-        ContextHolder.context().response().ok(userService.createUser(body));
+
+        return Response.ok(userService.createUser(body));
     }
 
 }
