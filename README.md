@@ -1,10 +1,7 @@
 # Ember Framework
 
 ## Overview
-
-Ember Framework is a lightweight Java web framework designed for building RESTful APIs with simplicity and flexibility.
-It provides features like dependency injection, middleware support, request validation, and annotation-based development
-to streamline the creation of modern web applications.
+Ember Framework is a lightweight Java web framework designed for building RESTful APIs with simplicity and flexibility. It provides features like dependency injection, middleware support, request validation, and annotation-based development to streamline the creation of modern web applications.
 
 ## Features
 - **Routing**: Flexible routing with support for path and query parameters.
@@ -33,30 +30,30 @@ to streamline the creation of modern web applications.
                   +------------------------+
                              |
                              v
-
-+----------------+ +----------------------+ +-------------------+
-| Middleware[]  | --> | MiddlewareChain | -->  | Route Handler(s) |
-+----------------+ +----------------------+ +-------------------+
-^
-|
-+--------------+
-| Server | <-- Starts and handles HttpServer
-+--------------+
-|
-v
-[ Incoming Request ]
-|
-v
-+--------------------------+
-| Context | <-- Holds request state, response, etc.
-+--------------------------+
-|
-v
-+--------------------------+
-| Final Response |
-+--------------------------+
++----------------+     +----------------------+      +-------------------+
+|  Middleware[]  | --> |     MiddlewareChain   | -->  |  Route Handler(s) |
++----------------+     +----------------------+      +-------------------+
+                             ^
+                             |
+                      +--------------+
+                      |   Server     | <-- Starts and handles HttpServer
+                      +--------------+
+                             |
+                             v
+                     [ Incoming Request ]
+                             |
+                             v
+                 +--------------------------+
+                 |        Context           | <-- Holds request state, response, etc.
+                 +--------------------------+
+                             |
+                             v
+                 +--------------------------+
+                 |     Final Response       |
+                 +--------------------------+
 
 ```
+
 
 ## Installation
 To use Ember Framework in your project, add the following Maven dependency to your `pom.xml`:
@@ -121,6 +118,7 @@ Access the endpoint at `http://localhost:8080/example/hello`.
 
 ### Middleware
 Use `@WithMiddleware` to apply middleware globally or to specific routes.
+
 
 ## Contributing
 Contributions are welcome! Please follow these steps:
