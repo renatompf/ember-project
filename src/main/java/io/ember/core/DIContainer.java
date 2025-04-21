@@ -316,9 +316,12 @@ public class DIContainer {
     private Object resolvePathParameter(PathParameter annotation, Parameter parameter, Map<String, String> pathParams) {
         String paramName = annotation.value();
         String paramValue = pathParams.get(paramName);
+
         if (paramValue == null) {
-            throw new IllegalArgumentException("Missing path parameter: " + paramName);
+            System.out.println("Optional parameter not provided, returning null.");
+            return null;
         }
+
         return TypeConverter.convert(paramValue, parameter.getType());
     }
 
@@ -339,6 +342,7 @@ public class DIContainer {
         }
         return TypeConverter.convert(paramValue, parameter.getType());
     }
+
     /**
      * Finds all classes annotated with `@Service` in the classpath.
      *

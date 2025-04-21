@@ -12,7 +12,7 @@ public class UserService {
     }
 
     public String getUserById(Integer id) {
-        return "User with ID: " + id;
+        return id == null ? "ID optional" : "User with ID: " + id;
     }
 
     public String[] listAllUsers() {

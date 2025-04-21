@@ -41,6 +41,11 @@ public class ExampleController {
         ContextHolder.context().response().ok(userService.getUserById(id));
     }
 
+    @Get("/:id?")
+    public void getUserByIdOptional(@PathParameter("id") Integer id) {
+        ContextHolder.context().response().ok(userService.getUserById(id));
+    }
+
     @Get("/list")
     public void listAllUsers() {
         ContextHolder.context().response().ok(String.join(", ", userService.listAllUsers()));

@@ -13,7 +13,6 @@ public class GlobalCustomMiddleware implements Middleware {
         // You can access request parameters, headers, etc. from the context
         System.out.println("Request Method: " + context.getMethod());
         System.out.println("Request Path: " + context.getPath());
-        System.out.println("Request Headers: " + context.headers().headers());
         // Call the next middleware in the chain
         context.next();
 
