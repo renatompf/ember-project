@@ -7,7 +7,6 @@ It provides features like dependency injection, middleware support, request vali
 to streamline the creation of modern web applications.
 
 ## Features
-
 - **Routing**: Flexible routing with support for path and query parameters.
 - **Dependency Injection**: Built-in DI container for managing services and controllers.
 - **Middleware**: Global and route-specific middleware for request handling.
@@ -60,11 +59,9 @@ v
 ```
 
 ## Installation
-
 To use Ember Framework in your project, add the following Maven dependency to your `pom.xml`:
 
 ```xml
-
 <dependency>
     <groupId>io.ember</groupId>
     <artifactId>ember-framework</artifactId>
@@ -75,7 +72,6 @@ To use Ember Framework in your project, add the following Maven dependency to yo
 ## Getting Started
 
 ### 1. Define a Controller
-
 Create a controller to handle HTTP requests:
 
 ```java
@@ -96,7 +92,6 @@ public class ExampleController {
 ```
 
 ### 2. Run the Application
-
 Start the server and access the endpoint:
 
 ```java
@@ -117,7 +112,6 @@ Access the endpoint at `http://localhost:8080/example/hello`.
 ## Documentation
 
 ### Annotations
-
 - `@Controller`: Marks a class as a controller.
 - `@Service`: Marks a class as a service.
 - `@Get`, `@Post`, `@Put`, ...: Maps HTTP methods to controller methods.
@@ -126,19 +120,14 @@ Access the endpoint at `http://localhost:8080/example/hello`.
 - `@RequestBody`: Binds the request body to a method argument.
 
 ### Middleware
-
 Use `@WithMiddleware` to apply middleware globally or to specific routes.
 
 ## Contributing
-
 Contributions are welcome! Please follow these steps:
-
 1. Fork the repository.
 2. Create a new branch for your feature or bug fix.
 3. Submit a pull request with a detailed description of your changes.
 
 ## License
-
 This project is licensed under the Apache 2.0 License. See the `LICENSE` file for details.
-
 ```
