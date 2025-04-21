@@ -3,6 +3,7 @@ package io.ember.core;
 import io.ember.EmberApplication;
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.*;
+import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.service.Service;
@@ -156,28 +157,33 @@ public class DIContainer {
             if (clazz.isAnnotationPresent(Controller.class)) {
                 String basePath = clazz.getAnnotation(Controller.class).value();
 
+                // Collect controller-level middleware
+                Class<? extends Middleware>[] controllerMiddleware = clazz.isAnnotationPresent(WithMiddleware.class)
+                        ? clazz.getAnnotation(WithMiddleware.class).value()
+                        : new Class[0];
+
                 for (Method method : clazz.getDeclaredMethods()) {
                     if (method.isAnnotationPresent(Get.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Get.class).value());
-                        app.get(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.get(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Post.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Post.class).value());
-                        app.post(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.post(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Put.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Put.class).value());
-                        app.put(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.put(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Delete.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Delete.class).value());
-                        app.delete(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.delete(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Patch.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Patch.class).value());
-                        app.patch(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.patch(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Options.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Options.class).value());
-                        app.options(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.options(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     } else if (method.isAnnotationPresent(Head.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Head.class).value());
-                        app.head(path, ctx -> invokeControllerMethod(controller, method, ctx));
+                        app.head(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
                     }
                 }
             }
@@ -196,6 +202,32 @@ public class DIContainer {
         if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         if (!path.startsWith("/")) path = "/" + path;
         return base + path;
+    }
+
+    private void handleWithMiddleware(Object controller, Method method, Context context, Class<? extends Middleware>[] controllerMiddleware) {
+        try {
+            // Collect method-level middleware
+            Class<? extends Middleware>[] methodMiddleware = method.isAnnotationPresent(WithMiddleware.class)
+                    ? method.getAnnotation(WithMiddleware.class).value()
+                    : new Class[0];
+
+            // Execute controller-level middleware
+            for (Class<? extends Middleware> middlewareClass : controllerMiddleware) {
+                Middleware middlewareInstance = middlewareClass.getDeclaredConstructor().newInstance();
+                middlewareInstance.handle(context);
+            }
+
+            // Execute method-level middleware
+            for (Class<? extends Middleware> middlewareClass : methodMiddleware) {
+                Middleware middlewareInstance = middlewareClass.getDeclaredConstructor().newInstance();
+                middlewareInstance.handle(context);
+            }
+
+            // Invoke the controller method
+            invokeControllerMethod(controller, method, context);
+        } catch (Exception e) {
+            context.response().internalServerError("Error: " + e.getMessage());
+        }
     }
 
     /**

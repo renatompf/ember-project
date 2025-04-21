@@ -41,6 +41,22 @@ public class HeadersManager {
     }
 
     /**
+     * Retrieves all request headers as a map.
+     * If the headers are not yet initialized, they are loaded from the exchange.
+     *
+     * @return A map of all request headers.
+     */
+    public Map<String, String> headers() {
+        if (headers == null) {
+            headers = new HashMap<>();
+            for (Map.Entry<String, List<String>> entry : exchange.getRequestHeaders().entrySet()) {
+                headers.put(entry.getKey(), entry.getValue().getFirst());
+            }
+        }
+        return headers;
+    }
+
+    /**
      * Sets a response header with the given key and value.
      *
      * @param key   The name of the header to set.

@@ -2,12 +2,18 @@ package io.ember.examples.ServiceExample.controller;
 
 import io.ember.annotations.controller.Controller;
 import io.ember.annotations.http.Get;
+import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.core.ContextHolder;
+import io.ember.examples.ServiceExample.middleware.CustomMiddleware;
+import io.ember.examples.ServiceExample.middleware.GlobalCustomMiddleware;
 import io.ember.examples.ServiceExample.service.UserService;
 
 @Controller("/example")
+@WithMiddleware({
+        GlobalCustomMiddleware.class
+})
 public class ExampleController {
 
     private final UserService userService;
@@ -17,6 +23,7 @@ public class ExampleController {
     }
 
     @Get("/get")
+    @WithMiddleware(CustomMiddleware.class)
     public void getUser() {
         ContextHolder.context().response().ok(userService.getUser());
     }
