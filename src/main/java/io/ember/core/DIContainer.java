@@ -17,6 +17,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The `DIContainer` class is a simple implementation of a Dependency Injection (DI) container.
@@ -24,7 +25,7 @@ import java.util.*;
  */
 public class DIContainer {
     // Map to store registered service classes and their instances
-    private final Map<Class<?>, Object> instances = new HashMap<>();
+    private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
     // ThreadLocal to keep track of resolving classes to prevent circular dependencies
     private final ThreadLocal<Set<Class<?>>> resolving = ThreadLocal.withInitial(HashSet::new);
