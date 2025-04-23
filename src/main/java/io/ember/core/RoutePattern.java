@@ -5,6 +5,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RoutePattern {
+    private final String rawPath;
     private final Pattern pattern;
     private final List<String> parameterNames;
 
@@ -25,6 +26,7 @@ public class RoutePattern {
      */
     public RoutePattern(String rawPath) {
        this.parameterNames = new ArrayList<>();
+       this.rawPath = rawPath;
        String regex = Arrays.stream(rawPath.split("/"))
                .map(
                        segment -> {
@@ -45,6 +47,15 @@ public class RoutePattern {
                 .orElse("");
 
         this.pattern = Pattern.compile("^" + regex + "$");
+    }
+
+    /**
+     * Returns the original raw path string used to create this route pattern.
+     *
+     * @return The raw path string that was provided when constructing this RoutePattern.
+     */
+    public String getRawPath() {
+        return rawPath;
     }
 
     /**

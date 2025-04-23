@@ -40,21 +40,73 @@ public class Router {
 
     /**
      * Retrieves the route that matches the specified HTTP method and path.
+     * <p>
+     * This method searches through the registered routes and identifies the best match
+     * for the given HTTP method and path. It resolves parameters for dynamic segments
+     * if the route contains placeholders (like `:id` or `*`).
+     * <p>
+     * To ensure correct matching, routes are sorted by specificity:
+     * <ul>
+     *   <li>Exact matches (e.g., `/example/get`) are prioritized.</li>
+     *   <li>Dynamic segments (`:id`) are processed after exact matches.</li>
+     *   <li>Optional parameters (`:id?`) and wildcard paths (`*`) are processed last.</li>
+     * </ul>
+     * If a match is found, it returns a `RouteMatchResult` containing the middleware chain
+     * and any extracted parameters. If no match is found, `null` is returned.
+     * </p>
      *
-     * @param method The HTTP method of the request.
-     * @param path   The path of the request.
+     * @param method The HTTP method of the request (e.g., GET, POST, DELETE).
+     * @param path   The path of the request (e.g., `/example/get`).
      * @return A `RouteMatchResult` containing the middleware chain and extracted parameters,
      *         or `null` if no matching route is found.
      */
     public RouteMatchResult getRoute(HttpMethod method, String path) {
+        // Sort routes by specificity: exact matches first, then dynamic segments
+        routes.sort((route1, route2) -> {
+            boolean exact1 = isExactMatch(route1.getPattern().getRawPath());
+            boolean exact2 = isExactMatch(route2.getPattern().getRawPath());
+
+            if (exact1 && !exact2){
+                return -1; // Exact matches come first
+            }
+
+            if (!exact1 && exact2) {
+                return 1;  // Dynamic matches come after exact matches
+            }
+
+            // If both are exact or both are dynamic, sort by path length (longer paths first)
+            return Integer.compare(route2.getPattern().getRawPath().length(), route1.getPattern().getRawPath().length());
+        });
+
+        // Iterate through the sorted routes to find a match
         for (RouteEntry entry : routes) {
+            // Check if the route matches both method and path
             if (entry.getMethod() == method && entry.getPattern().matches(path)) {
+                // Extract parameters from the path and return the match result
                 Map<String, String> params = entry.getPattern().extractParameters(path);
                 return new RouteMatchResult(entry.getMiddlewareChain(), params);
             }
         }
 
+        // No matching route was found
         return null;
     }
+
+    /**
+     * Determines if a route path is an exact match (no dynamic segments).
+     * <p>
+     * This helper method checks whether the given route path contains any placeholders
+     * (`:` for dynamic segments or `*` for wildcards).
+     * Exact paths, such as `/example/get`,
+     * are prioritized during route matching to avoid conflicts with dynamic routes.
+     * </p>
+     *
+     * @param rawPath The raw path string of the route (e.g., `/example/get` or `/example/:id`).
+     * @return `true` if the raw path is an exact match, `false` if it contains dynamic segments.
+     */
+    private boolean isExactMatch(String rawPath) {
+        return !rawPath.contains(":") && !rawPath.contains("*");
+    }
+
 
 }
