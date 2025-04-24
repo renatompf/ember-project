@@ -1,6 +1,8 @@
 package io.ember.core;
 
 import io.ember.enums.HttpMethod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.function.Consumer;
  */
 public class Router {
 
+    private static final Logger logger = LoggerFactory.getLogger(Router.class);
+
     private final List<RouteEntry> routes = new ArrayList<>();
 
     /**
@@ -24,6 +28,7 @@ public class Router {
      * @param handler The handler to process requests to this route.
      */
     public void register(HttpMethod method, String path, Consumer<Context> handler) {
+        logger.debug("Registering route: method={}, path={}, handler={}", method, path, handler);
         routes.add(new RouteEntry(method, path, new MiddlewareChain(List.of(), handler)));
     }
 
@@ -35,6 +40,7 @@ public class Router {
      * @param chain  The middleware chain to process requests to this route.
      */
     public void register(HttpMethod method, String path, MiddlewareChain chain) {
+        logger.debug("Registering route: method={}, path={}, chain={}", method, path, chain);
         routes.add(new RouteEntry(method, path, chain));
     }
 
@@ -61,6 +67,8 @@ public class Router {
      *         or `null` if no matching route is found.
      */
     public RouteMatchResult getRoute(HttpMethod method, String path) {
+        logger.debug("Finding route for method: {}, path: {}", method, path);
+
         // Sort routes by specificity: exact matches first, then dynamic segments
         routes.sort((route1, route2) -> {
             boolean exact1 = isExactMatch(route1.getPattern().getRawPath());
@@ -80,15 +88,18 @@ public class Router {
 
         // Iterate through the sorted routes to find a match
         for (RouteEntry entry : routes) {
+            logger.debug("Checking route: method={}, path={}, pattern={}", method, path, entry.getPattern().getRawPath());
             // Check if the route matches both method and path
             if (entry.getMethod() == method && entry.getPattern().matches(path)) {
                 // Extract parameters from the path and return the match result
                 Map<String, String> params = entry.getPattern().extractParameters(path);
+                logger.debug("Route matched: method={}, path={}, params={}", method, path, params);
                 return new RouteMatchResult(entry.getMiddlewareChain(), params);
             }
         }
 
-        // No matching route was found
+        // If no match is found, log a warning and return null
+        logger.warn("No matching route found: method={}, path={}", method, path);
         return null;
     }
 
@@ -105,7 +116,9 @@ public class Router {
      * @return `true` if the raw path is an exact match, `false` if it contains dynamic segments.
      */
     private boolean isExactMatch(String rawPath) {
-        return !rawPath.contains(":") && !rawPath.contains("*");
+        boolean isExact = !rawPath.contains(":") && !rawPath.contains("*");
+        logger.debug("Checking if path is exact: path={}, isExact={}", rawPath, isExact);
+        return isExact;
     }
 
 

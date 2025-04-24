@@ -9,6 +9,8 @@ import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.parameters.RequestBody;
 import io.ember.annotations.service.Service;
 import io.ember.utils.TypeConverter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,6 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * The container supports automatic resolution of dependencies and prevents circular dependencies.
  */
 public class DIContainer {
+
+    private static final Logger logger = LoggerFactory.getLogger(DIContainer.class);
+
     // Map to store registered service classes and their instances
     private final Map<Class<?>, Object> instances = new ConcurrentHashMap<>();
 
@@ -44,7 +49,9 @@ public class DIContainer {
     public <T> void register(Class<T> serviceClass) {
         if (serviceClass.isAnnotationPresent(Service.class) || serviceClass.isAnnotationPresent(Controller.class)) {
             instances.put(serviceClass, UNRESOLVED); // Mark as registered
+            logger.info("Registered service: {}", serviceClass.getName());
         } else {
+            logger.error("Class {} is not annotated with @Service or @Controller", serviceClass.getName());
             throw new IllegalArgumentException("Class " + serviceClass.getName() + " is not annotated with @Service");
         }
     }
@@ -58,6 +65,7 @@ public class DIContainer {
     public void registerServices() {
         try {
             List<Class<?>> serviceClasses = findServices();
+            logger.info("Found {} service classes", serviceClasses.size());
             for (Class<?> serviceClass : serviceClasses) {
                 register(serviceClass);
             }
@@ -75,6 +83,7 @@ public class DIContainer {
     public void registerControllers() {
         try {
             List<Class<?>> controllerClasses = findControllers();
+            logger.info("Found {} controller classes", controllerClasses.size());
             for (Class<?> controllerClass : controllerClasses) {
                 register(controllerClass);
             }
@@ -108,16 +117,19 @@ public class DIContainer {
     public <T> T resolve(Class<T> serviceClass) {
         Object instance = instances.get(serviceClass);
         if (instance != null && instance != UNRESOLVED) {
+            logger.debug("Resolved service: {}", serviceClass.getName());
             return (T) instance;
         }
 
         // Prevent circular dependencies
         if (resolving.get().contains(serviceClass)) {
+            logger.error("Circular dependency detected for service: {}", serviceClass.getName());
             throw new IllegalStateException("Circular dependency detected for: " + serviceClass.getName());
         }
 
         resolving.get().add(serviceClass);
         try {
+            logger.debug("Resolving service: {}", serviceClass.getName());
             // Use computeIfAbsent to ensure only one thread creates the instance
             return (T) instances.computeIfPresent(serviceClass, (cls, existing) -> {
                 if (existing != UNRESOLVED) {
@@ -127,6 +139,7 @@ public class DIContainer {
                 try {
                     Constructor<?>[] constructors = cls.getConstructors();
                     if (constructors.length != 1) {
+                        logger.error("Service must have exactly one public constructor: {}", cls.getName());
                         throw new IllegalStateException("Service must have exactly one public constructor: " + cls.getName());
                     }
 
@@ -135,8 +148,10 @@ public class DIContainer {
                             .map(this::resolve)
                             .toArray();
 
+                    logger.info("Successfully resolved service: {}", cls.getName());
                     return constructor.newInstance(parameters);
                 } catch (Exception e) {
+                    logger.error("Failed to resolve service: {}", cls.getName(), e);
                     throw new RuntimeException("Failed to resolve service: " + cls.getName(), e);
                 }
             });
@@ -155,7 +170,7 @@ public class DIContainer {
      */
     public void mapControllerRoutes(EmberApplication app) {
         if (instances == null || instances.isEmpty()) {
-            System.out.println("No controllers registered to map routes for");
+            logger.warn("No controllers registered to map routes for");
             return;
         }
 
@@ -167,6 +182,7 @@ public class DIContainer {
             Class<?> clazz = controller.getClass();
             if (clazz.isAnnotationPresent(Controller.class)) {
                 String basePath = clazz.getAnnotation(Controller.class).value();
+                logger.info("Mapping routes for controller: {}", clazz.getName());
 
                 // Collect controller-level middleware
                 Class<? extends Middleware>[] controllerMiddleware = clazz.isAnnotationPresent(WithMiddleware.class)
@@ -177,24 +193,31 @@ public class DIContainer {
                     if (method.isAnnotationPresent(Get.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Get.class).value());
                         app.get(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped GET route: {}", path);
                     } else if (method.isAnnotationPresent(Post.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Post.class).value());
                         app.post(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped POST route: {}", path);
                     } else if (method.isAnnotationPresent(Put.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Put.class).value());
                         app.put(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped PUT route: {}", path);
                     } else if (method.isAnnotationPresent(Delete.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Delete.class).value());
                         app.delete(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped DELETE route: {}", path);
                     } else if (method.isAnnotationPresent(Patch.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Patch.class).value());
                         app.patch(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped PATCH route: {}", path);
                     } else if (method.isAnnotationPresent(Options.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Options.class).value());
                         app.options(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped OPTIONS route: {}", path);
                     } else if (method.isAnnotationPresent(Head.class)) {
                         String path = combinePaths(basePath, method.getAnnotation(Head.class).value());
                         app.head(path, ctx -> handleWithMiddleware(controller, method, ctx, controllerMiddleware));
+                        logger.debug("Mapped HEAD route: {}", path);
                     }
                 }
             }
@@ -209,9 +232,11 @@ public class DIContainer {
      * @return The combined path.
      */
     private String combinePaths(String base, String path) {
+        logger.debug("Combining paths: {} + {}", base, path);
         if (base.isEmpty()) return path;
         if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         if (!path.startsWith("/")) path = "/" + path;
+        logger.debug("Combined paths: {} + {} = {}", base, path, base + path);
         return base + path;
     }
 
@@ -225,6 +250,7 @@ public class DIContainer {
      */
     private void handleWithMiddleware(Object controller, Method method, Context context, Class<? extends Middleware>[] controllerMiddleware) {
         try {
+            logger.debug("Handling middleware for method: {}.{}", controller.getClass().getName(), method.getName());
             // Collect method-level middleware
             Class<? extends Middleware>[] methodMiddleware = method.isAnnotationPresent(WithMiddleware.class)
                     ? method.getAnnotation(WithMiddleware.class).value()
@@ -232,12 +258,14 @@ public class DIContainer {
 
             // Execute controller-level middleware
             for (Class<? extends Middleware> middlewareClass : controllerMiddleware) {
+                logger.debug("Executing controller-level middleware: {}", middlewareClass.getName());
                 Middleware middlewareInstance = middlewareClass.getDeclaredConstructor().newInstance();
                 middlewareInstance.handle(context);
             }
 
             // Execute method-level middleware
             for (Class<? extends Middleware> middlewareClass : methodMiddleware) {
+                logger.debug("Executing method-level middleware: {}", middlewareClass.getName());
                 Middleware middlewareInstance = middlewareClass.getDeclaredConstructor().newInstance();
                 middlewareInstance.handle(context);
             }
@@ -245,6 +273,7 @@ public class DIContainer {
             // Invoke the controller method
             invokeControllerMethod(controller, method, context);
         } catch (Exception e) {
+            logger.error("Error while handling middleware or invoking controller method: {}", e.getMessage());
             context.response().internalServerError("Error: " + e.getMessage());
         }
     }
@@ -264,18 +293,22 @@ public class DIContainer {
      */
     private Object invokeControllerMethod(Object controller, Method method, Context context) {
         try {
+            logger.debug("Invoking controller method: {}.{}", controller.getClass().getName(), method.getName());
             Parameter[] parameters = method.getParameters();
             Object[] args = new Object[parameters.length];
 
             for (int i = 0; i < parameters.length; i++) {
                 Parameter parameter = parameters[i];
                 args[i] = resolveParameter(parameter, context);
+                logger.debug("Resolved parameter {} of method {}.{} to {}", i, controller.getClass().getName(), method.getName(), args[i]);
             }
 
             Object result = method.invoke(controller, args);
+            logger.debug("Controller method {}.{} returned: {}", controller.getClass().getName(), method.getName(), result);
             handleControllerResult(result, context);
             return result;
         } catch (Exception e) {
+            logger.error("Failed to invoke controller method: {}.{} - {}", controller.getClass().getName(), method.getName(), e.getMessage());
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
         }
     }
@@ -292,10 +325,13 @@ public class DIContainer {
      */
     private void handleControllerResult(Object result, Context context) {
         if (result instanceof Response response) {
+            logger.debug("Sending response with status code {} and body: {}", response.statusCode(), response.body());
             context.response().sendJson(response.body(), response.statusCode());
         } else if (result != null) {
+            logger.debug("Sending response with status code 200 and body: {}", result);
             context.response().sendJson(result.toString(), 200);
         } else {
+            logger.debug("Sending empty response with status code 204");
             context.response().sendJson("", 204);
         }
     }
@@ -309,20 +345,24 @@ public class DIContainer {
      * @return The resolved parameter value, or `null` if the parameter type is unsupported.
      */
     private Object resolveParameter(Parameter parameter, Context context) {
+        logger.debug("Resolving parameter {} of type {}", parameter.getName(), parameter.getType().getName());
         // Handle path parameters
         PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
         if (pathParam != null) {
+            logger.debug("Resolving path parameter {} for parameter {}", pathParam.value(), parameter.getName());
             return resolvePathParameter(pathParam, parameter, context.pathParams().pathParams());
         }
 
         // Handle query parameters
         QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
         if (queryParam != null) {
+            logger.debug("Resolving query parameter {} for parameter {}", queryParam.value(), parameter.getName());
             return resolveQueryParameter(queryParam, parameter, context.queryParams().queryParams());
         }
 
         // Handle request body
         if (parameter.isAnnotationPresent(RequestBody.class)) {
+            logger.debug("Resolving request body for parameter {}", parameter.getName());
             Class<?> type = parameter.getType();
             return context.body().parseBodyAs(type);
         }
@@ -332,6 +372,7 @@ public class DIContainer {
             return context;
         }
 
+        logger.debug("Parameter {} of type {} is not supported", parameter.getName(), parameter.getType().getName());
         // Default to null for unsupported parameters
         return null;
     }
@@ -350,7 +391,7 @@ public class DIContainer {
         String paramValue = pathParams.get(paramName);
 
         if (paramValue == null) {
-            System.out.println("Optional parameter not provided, returning null.");
+            logger.debug("Optional parameter not provided, returning null.");
             return null;
         }
 
@@ -370,6 +411,7 @@ public class DIContainer {
         String paramName = annotation.value();
         String paramValue = queryParams.get(paramName);
         if (paramValue == null) {
+            logger.debug("Required query parameter {} not provided, returning null.", paramName);
             throw new IllegalArgumentException("Missing query parameter: " + paramName);
         }
         return TypeConverter.convert(paramValue, parameter.getType());
@@ -383,17 +425,21 @@ public class DIContainer {
      * @throws IOException            if an error occurs while reading resources.
      */
     private static List<Class<?>> findServices() throws ClassNotFoundException, IOException {
+        logger.info("Finding all service classes in the classpath");
         List<Class<?>> serviceClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         var resources = classLoader.getResources(""); // Empty string gets all resources
 
         while (resources.hasMoreElements()) {
             var resource = resources.nextElement();
+            logger.debug("Found resource: {}", resource);
             var file = new File(resource.getFile());
             if (file.isDirectory()) {
+                logger.debug("Scanning directory: {}", file.getAbsolutePath());
                 serviceClasses.addAll(findClassesInDirectory(file, "", Service.class));
             } else if (resource.getProtocol().equals("jar")) {
                 var jarFilePath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
+                logger.debug("Resource is a JAR file: {}", jarFilePath);
                 try (var jarFile = new java.util.jar.JarFile(jarFilePath)) {
                     var entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
@@ -403,16 +449,20 @@ public class DIContainer {
                             try {
                                 var clazz = Class.forName(className, false, classLoader); // Don't initialize yet
                                 if (clazz.isAnnotationPresent(Service.class)) {
+                                    logger.debug("Found service class: {}", clazz.getName());
                                     serviceClasses.add(clazz);
                                 }
                             } catch (NoClassDefFoundError | UnsupportedClassVersionError ignored) {
                                 // Log or handle errors as needed
+                                logger.error("Failed to load class: {}", className);
                             }
                         }
                     }
                 }
             }
         }
+
+        logger.info("Completed finding @Service classes. Total found: {}", serviceClasses.size());
         return serviceClasses;
     }
 
@@ -424,16 +474,20 @@ public class DIContainer {
      * @throws IOException            if an error occurs while reading resources.
      */
     private static List<Class<?>> findControllers() throws ClassNotFoundException, IOException {
+        logger.info("Finding all controller classes in the classpath");
         List<Class<?>> controllerClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         var resources = classLoader.getResources(""); // Empty string gets all resources
 
         while (resources.hasMoreElements()) {
             var resource = resources.nextElement();
+            logger.debug("Found resource: {}", resource);
             var file = new File(resource.getFile());
             if (file.isDirectory()) {
+                logger.debug("Scanning directory: {}", file.getAbsolutePath());
                 controllerClasses.addAll(findClassesInDirectory(file, "", Controller.class));
             } else if (resource.getProtocol().equals("jar")) {
+                logger.debug("Resource is a JAR file: {}", resource.getPath());
                 var jarFilePath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
                 try (var jarFile = new java.util.jar.JarFile(jarFilePath)) {
                     var entries = jarFile.entries();
@@ -444,16 +498,18 @@ public class DIContainer {
                             try {
                                 var clazz = Class.forName(className, false, classLoader); // Don't initialize yet
                                 if (clazz.isAnnotationPresent(Controller.class)) {
+                                    logger.debug("Found controller class: {}", clazz.getName());
                                     controllerClasses.add(clazz);
                                 }
                             } catch (NoClassDefFoundError | UnsupportedClassVersionError ignored) {
-                                // Log or handle errors as needed
+                                logger.error("Failed to load class: {}", className);
                             }
                         }
                     }
                 }
             }
         }
+        logger.info("Completed finding @Controller classes. Total found: {}", controllerClasses.size());
         return controllerClasses;
     }
 
@@ -471,6 +527,7 @@ public class DIContainer {
             String packageName,
             Class<A> annotationType) throws ClassNotFoundException {
 
+        logger.debug("Finding classes in directory: {} with package name: {}", directory.getAbsolutePath(), packageName);
         List<Class<?>> classes = new ArrayList<>();
         if (!directory.exists()) {
             return classes;
@@ -480,6 +537,7 @@ public class DIContainer {
         if (files != null) {
             for (var file : files) {
                 if (file.isDirectory()) {
+                    logger.debug("Found subdirectory: {}", file.getAbsolutePath());
                     classes.addAll(findClassesInDirectory(
                             file,
                             packageName + (packageName.isEmpty() ? "" : ".") + file.getName(),
@@ -489,10 +547,11 @@ public class DIContainer {
                     try {
                         var clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
                         if (clazz.isAnnotationPresent(annotationType)) {
+                            logger.debug("Found class with annotation {}: {}", annotationType.getSimpleName(), clazz.getName());
                             classes.add(clazz);
                         }
                     } catch (NoClassDefFoundError | UnsupportedClassVersionError ignored) {
-                        // Log or handle errors as needed
+                        logger.error("Failed to load class: {}", className);
                     }
                 }
             }
