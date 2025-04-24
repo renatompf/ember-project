@@ -1,8 +1,8 @@
 import io.ember.annotations.service.Service;
 import io.ember.core.DIContainer;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class DIContainerTest {
 
@@ -28,8 +28,8 @@ public class DIContainerTest {
         container.registerServices();
 
         // Verify that the services are registered
-        assertNotNull("TestService should be registered and resolved.", container.resolve(TestService.class));
-        assertNotNull("AnotherTestService should be registered and resolved.", container.resolve(AnotherTestService.class));
+        assertNotNull(container.resolve(TestService.class),"TestService should be registered and resolved.");
+        assertNotNull(container.resolve(AnotherTestService.class), "AnotherTestService should be registered and resolved.");
     }
 
 }

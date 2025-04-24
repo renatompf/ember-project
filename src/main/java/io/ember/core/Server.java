@@ -5,6 +5,8 @@ import io.ember.enums.HttpStatusCode;
 import io.ember.enums.MediaType;
 import io.ember.enums.RequestHeader;
 import io.ember.exceptions.HttpException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -17,6 +19,8 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 public class Server {
+
+    private static final Logger logger = LoggerFactory.getLogger(Server.class);
 
     private final Router router;
     private final List<Middleware> middleware;
@@ -50,9 +54,11 @@ public class Server {
             HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
             // Setting the custom executor for handling requests asynchronously
             server.setExecutor(Executors.newCachedThreadPool());
+            logger.info("HTTP server created and executor set.");
 
             // Setting up the context for handling requests
             server.createContext("/", exchange -> {
+                logger.info("Received request: {} {}", exchange.getRequestMethod(), exchange.getRequestURI());
                 Context context = new Context(
                         exchange,
                         exchange.getRequestURI().getQuery(),
@@ -69,10 +75,12 @@ public class Server {
                 try {
                     context.next();
                 } catch (HttpException e) {
+                    logger.error("HTTP exception occurred: {}", e.getMessage());
                     exchange.sendResponseHeaders(e.getStatus().getCode(), 0);
                     exchange.getResponseBody().write(e.getMessage().getBytes());
                     exchange.close();
                 } catch (Exception e) {
+                    logger.error("Unexpected error occurred while processing request.", e);
                     e.printStackTrace();
                     HttpStatusCode internalServerError = HttpStatusCode.INTERNAL_SERVER_ERROR;
                     exchange.sendResponseHeaders(internalServerError.getCode(), 0);
@@ -83,10 +91,10 @@ public class Server {
             });
 
             server.start();
-            System.out.println("==== Server started on port " + port + " ====");
+            logger.info("============ HTTP server started on port {} ============", port);
         }catch (IOException e){
             e.printStackTrace();
-            System.out.println("==== Failed to start server on port " + port + " ====");
+            logger.error("Failed to start HTTP server on port {}: {}", port, e.getMessage());
         }
 
     }
@@ -103,14 +111,17 @@ public class Server {
      * @return A list of middleware to be executed for the request.
      */
     private List<Middleware> buildMiddlewareChain(Context context) {
+        logger.debug("Building middleware chain for request: {} {}", context.getMethod(), context.getPath());
         RouteMatchResult match = router.getRoute(context.getMethod(), context.getPath());
 
         List<Middleware> fullChain = new ArrayList<>(middleware);
         if(match != null) {
+            logger.debug("Route match found: {}", match);
             context.pathParams().setPathParams(match.parameters());
             fullChain.addAll(match.middlewareChain().middleware());
             fullChain.add(c -> match.middlewareChain().handler().accept(c));
         } else {
+            logger.warn("No route match found for path: {}", context.getPath());
             fullChain.add(c -> {
                 c.response().send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
             });
