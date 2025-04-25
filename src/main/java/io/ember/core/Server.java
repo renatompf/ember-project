@@ -24,6 +24,7 @@ public class Server {
 
     private final Router router;
     private final List<Middleware> middleware;
+    private HttpServer server;
 
     public Server(Router router, List<Middleware> middleware) {
         this.router = router;
@@ -51,7 +52,7 @@ public class Server {
     public void start(int port) {
 
         try{
-            HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+            server = HttpServer.create(new InetSocketAddress(port), 0);
             // Setting the custom executor for handling requests asynchronously
             server.setExecutor(Executors.newCachedThreadPool());
             logger.info("HTTP server created and executor set.");
@@ -112,22 +113,38 @@ public class Server {
      */
     private List<Middleware> buildMiddlewareChain(Context context) {
         logger.debug("Building middleware chain for request: {} {}", context.getMethod(), context.getPath());
-        RouteMatchResult match = router.getRoute(context.getMethod(), context.getPath());
-
         List<Middleware> fullChain = new ArrayList<>(middleware);
-        if(match != null) {
-            logger.debug("Route match found: {}", match);
-            context.pathParams().setPathParams(match.parameters());
-            fullChain.addAll(match.middlewareChain().middleware());
-            fullChain.add(c -> match.middlewareChain().handler().accept(c));
-        } else {
-            logger.warn("No route match found for path: {}", context.getPath());
+
+        try {
+            RouteMatchResult match = router.getRoute(context.getMethod(), context.getPath());
+            if(match != null) {
+                logger.debug("Route match found: {}", match);
+                context.pathParams().setPathParams(match.parameters());
+                fullChain.addAll(match.middlewareChain().middleware());
+                fullChain.add(c -> match.middlewareChain().handler().accept(c));
+            } else {
+                logger.warn("No route match found for path: {}", context.getPath());
+                fullChain.add(c -> {
+                    c.response().send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
+                });
+            }
+        } catch (HttpException e) {
+            logger.error("HTTP exception occurred while building middleware chain: {}", e.getMessage());
             fullChain.add(c -> {
-                c.response().send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
+                c.response().send(e.getMessage(), e.getStatus().getCode());
             });
         }
 
         return fullChain;
     }
+
+    public void stop() {
+        if (server != null) {
+            server.stop(0);
+            logger.info("HTTP server stopped");
+        }
+    }
+
+
 
 }
