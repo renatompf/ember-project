@@ -55,46 +55,54 @@ Ember Framework is a lightweight Java web framework designed for building RESTfu
 ```
 
 
-## Getting Started
-
-### 1. Define a Controller
-Create a controller to handle HTTP requests:
+## Example
 
 ```java
-package io.ember.examples;
+package io.ember.examples.middleware;
 
-import io.ember.annotations.controller.Controller;
-import io.ember.annotations.http.Get;
-import io.ember.core.ContextHolder;
-import io.ember.core.Response;
+import io.ember.annotations.middleware.WithMiddleware;
+import io.ember.core.Context;
+import io.ember.annotations.middleware.Middleware;
 
-@Controller("/example")
-public class ExampleController {
+// Declare middleware for authentication
+public class AuthMiddleware implements Middleware {
+    @Override
+    public void handle(Context context) {
+        String token = context.request().getHeader("Authorization");
+        if (token == null || !token.equals("valid-token")) {
+            context.response().unauthorized("Invalid or missing token");
+            throw new RuntimeException("Unauthorized");
+        }
+    }
+}
 
-    @Get("/hello")
-    public Response sayHello() {
-        return Response.ok("Hello, World!");
+// Declare middleware for logging
+public class LoggingMiddleware implements Middleware {
+    @Override
+    public void handle(Context context) {
+        System.out.println("Request received: " + context.request().getPath());
+    }
+}
+
+// Controller using middleware
+@Controller("/secure")
+@WithMiddleware({AuthMiddleware.class}) // Applied to all methods in this controller
+public class SecureController {
+
+    @Get("/data")
+    public Response getData() {
+        return Response.ok("Secure data accessed successfully!");
+    }
+
+    @Get("/validate")
+    @WithMiddleware(LoggingMiddleware.class)
+    public Response validateAndGetData() {
+        return Response.ok("Validation passed, secure data accessed!");
     }
 }
 ```
 
-### 2. Run the Application
-Start the server and access the endpoint:
-
-```java
-package io.ember.examples;
-
-import io.ember.core.EmberApplication;
-
-public class Application {
-    public static void main(String[] args) {
-        EmberApplication app = new EmberApplication();
-        app.start(8080);
-    }
-}
-```
-
-Access the endpoint at `http://localhost:8080/example/hello`.
+Access the secure endpoint at `http://localhost:8080/secure/data` and `http://localhost:8080/secure/validate`  with a valid token in the header.
 
 ## Documentation
 
