@@ -1,6 +1,9 @@
 package io.ember.core;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,7 +47,7 @@ public class RoutePattern {
                        }
                )
                .reduce((a, b) -> a + "/" + b)
-                .orElse("");
+               .orElse("");
 
         this.pattern = Pattern.compile("^" + regex + "$");
     }
@@ -83,15 +86,20 @@ public class RoutePattern {
         }
 
         for (int i = 0; i < parameterNames.size(); i++) {
-            if(parameterNames.contains("*")) {
+            if (parameterNames.contains("*")) {
                 int wildcardIndex = parameterNames.indexOf("*");
-                parameters.put("*", path.split("/", wildcardIndex+2)[wildcardIndex+1]);
+                String[] pathParts = path.split("/");
+                // Skip the base path parts and join the rest
+                String wildcardValue = String.join("/",
+                        Arrays.copyOfRange(pathParts, wildcardIndex + 2, pathParts.length));
+                parameters.put("*", wildcardValue);
             } else {
                 String paramName = parameterNames.get(i);
                 String paramValue = matcher.group(i + 1);
                 parameters.put(paramName, paramValue);
             }
         }
+
 
         return parameters;
     }
