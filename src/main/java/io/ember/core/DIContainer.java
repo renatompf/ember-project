@@ -8,6 +8,7 @@ import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.parameters.RequestBody;
 import io.ember.annotations.service.Service;
+import io.ember.exceptions.CircularDependencyException;
 import io.ember.utils.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,7 +125,7 @@ public class DIContainer {
         // Prevent circular dependencies
         if (resolving.get().contains(serviceClass)) {
             logger.error("Circular dependency detected for service: {}", serviceClass.getName());
-            throw new IllegalStateException("Circular dependency detected for: " + serviceClass.getName());
+            throw new CircularDependencyException("Circular dependency detected for: " + serviceClass.getName());
         }
 
         resolving.get().add(serviceClass);
@@ -137,6 +138,14 @@ public class DIContainer {
                 }
 
                 try {
+
+                    // Check if the class has declared fields
+                    if (cls.getDeclaredFields().length == 0) {
+                        // No fields, instantiate using the default constructor
+                        logger.info("No fields found in {}, using default constructor.", cls.getName());
+                        return cls.getDeclaredConstructor().newInstance();
+                    }
+
                     Constructor<?>[] constructors = cls.getConstructors();
                     if (constructors.length != 1) {
                         logger.error("Service must have exactly one public constructor: {}", cls.getName());
@@ -150,6 +159,11 @@ public class DIContainer {
 
                     logger.info("Successfully resolved service: {}", cls.getName());
                     return constructor.newInstance(parameters);
+                } catch (CircularDependencyException e) {
+                    throw e;
+                } catch (IllegalStateException e){
+                    logger.error("Service has circular dependencies: {}", cls.getName());
+                    throw e;
                 } catch (Exception e) {
                     logger.error("Failed to resolve service: {}", cls.getName(), e);
                     throw new RuntimeException("Failed to resolve service: " + cls.getName(), e);
@@ -233,9 +247,15 @@ public class DIContainer {
      */
     private String combinePaths(String base, String path) {
         logger.debug("Combining paths: {} + {}", base, path);
-        if (base.isEmpty()) return path;
-        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        if (!path.startsWith("/")) path = "/" + path;
+        if (base.isEmpty()) {
+            return path.startsWith("/") ? path : "/" + path;
+        }
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
         logger.debug("Combined paths: {} + {} = {}", base, path, base + path);
         return base + path;
     }
@@ -546,7 +566,7 @@ public class DIContainer {
                     var className = packageName + (packageName.isEmpty() ? "" : ".") + file.getName().substring(0, file.getName().length() - 6);
                     try {
                         var clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-                        if (clazz.isAnnotationPresent(annotationType)) {
+                        if (clazz.isAnnotationPresent(annotationType) && !clazz.isLocalClass() && !clazz.isAnonymousClass()) {
                             logger.debug("Found class with annotation {}: {}", annotationType.getSimpleName(), clazz.getName());
                             classes.add(clazz);
                         }
@@ -558,4 +578,16 @@ public class DIContainer {
         }
         return classes;
     }
+
+
+    /**
+     * Checks if a class is registered in the DI container.
+     *
+     * @param cls The class to check.
+     * @return `true` if the class is registered, `false` otherwise.
+     */
+    public boolean isRegistered(Class<?> cls) {
+        return instances.containsKey(cls);
+    }
+
 }
