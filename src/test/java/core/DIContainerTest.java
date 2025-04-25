@@ -34,15 +34,10 @@ class DIContainerTest {
     @Mock
     private ResponseHandler responseHandler;
 
+    // ========= Test Classes =========
+
+    // Static variable to track middleware call count
     public static AtomicInteger middlewareCallCount = new AtomicInteger(0);
-
-    @BeforeEach
-    void setUp() {
-        container = new DIContainer();
-        lenient().when(context.response()).thenReturn(responseHandler);
-        middlewareCallCount.set(0);
-
-    }
 
     @Controller("/api")
     public static class TestApiController {
@@ -103,6 +98,15 @@ class DIContainerTest {
         }
     }
 
+    // ========= End of Test Classes =========
+
+    @BeforeEach
+    void setUp() {
+        container = new DIContainer();
+        lenient().when(context.response()).thenReturn(responseHandler);
+        middlewareCallCount.set(0);
+
+    }
 
     @Test
     void fullLifecycle_WithValidController_ShouldMapAndHandleRequests() {
