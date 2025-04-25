@@ -8,7 +8,6 @@ import io.ember.annotations.parameters.PathParameter;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.parameters.RequestBody;
 import io.ember.annotations.service.Service;
-import io.ember.exceptions.CircularDependencyException;
 import io.ember.utils.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +16,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
@@ -102,6 +102,7 @@ public class DIContainer {
         }
     }
 
+
     /**
      * Resolves a specific service class by creating an instance and injecting its dependencies.
      * This method ensures that circular dependencies are prevented and that only one instance
@@ -116,64 +117,111 @@ public class DIContainer {
      */
     @SuppressWarnings("unchecked")
     public <T> T resolve(Class<T> serviceClass) {
+        // Check if the service is already resolved
         Object instance = instances.get(serviceClass);
         if (instance != null && instance != UNRESOLVED) {
             logger.debug("Resolved service: {}", serviceClass.getName());
             return (T) instance;
         }
 
-        // Prevent circular dependencies
+        // Detect circular dependencies and return a partially initialized instance
         if (resolving.get().contains(serviceClass)) {
-            logger.error("Circular dependency detected for service: {}", serviceClass.getName());
-            throw new CircularDependencyException("Circular dependency detected for: " + serviceClass.getName());
+            logger.debug("Circular dependency detected, returning partially initialized instance for: {}", serviceClass.getName());
+            return (T) instances.get(serviceClass);
         }
 
+        // Mark the service as being resolved
         resolving.get().add(serviceClass);
         try {
             logger.debug("Resolving service: {}", serviceClass.getName());
-            // Use computeIfAbsent to ensure only one thread creates the instance
             return (T) instances.computeIfPresent(serviceClass, (cls, existing) -> {
                 if (existing != UNRESOLVED) {
                     return existing;
                 }
 
                 try {
-
-                    // Check if the class has declared fields
-                    if (cls.getDeclaredFields().length == 0) {
-                        // No fields, instantiate using the default constructor
-                        logger.info("No fields found in {}, using default constructor.", cls.getName());
-                        return cls.getDeclaredConstructor().newInstance();
-                    }
-
                     Constructor<?>[] constructors = cls.getConstructors();
-                    if (constructors.length != 1) {
-                        logger.error("Service must have exactly one public constructor: {}", cls.getName());
-                        throw new IllegalStateException("Service must have exactly one public constructor: " + cls.getName());
+
+                    // Handle classes with no public constructors
+                    if (constructors.length == 0) {
+                        Field[] fields = cls.getDeclaredFields();
+                        boolean hasFieldsToInject = Arrays.stream(fields)
+                                .anyMatch(field -> java.lang.reflect.Modifier.isFinal(field.getModifiers()) &&
+                                        !java.lang.reflect.Modifier.isStatic(field.getModifiers()));
+
+                        if (!hasFieldsToInject) {
+                            // Create an instance using the default constructor
+                            T newInstance = (T) cls.getDeclaredConstructor().newInstance();
+                            instances.put(serviceClass, newInstance);
+                            logger.info("Successfully resolved service with default constructor (no dependencies): {}", cls.getName());
+                            return newInstance;
+                        } else {
+                            logger.error("Service {} has fields requiring injection but no public constructor", cls.getName());
+                            throw new IllegalStateException("Service " + cls.getName() + " has fields requiring injection but no public constructor");
+                        }
                     }
 
-                    Constructor<?> constructor = constructors[0];
-                    Object[] parameters = Arrays.stream(constructor.getParameterTypes())
-                            .map(this::resolve)
-                            .toArray();
+                    // Prefer a no-arg constructor if available
+                    Constructor<?> constructor = null;
+                    for (Constructor<?> ctor : constructors) {
+                        if (ctor.getParameterCount() == 0) {
+                            constructor = ctor;
+                            break;
+                        }
+                    }
+
+                    // Use the first constructor if no no-arg constructor is found
+                    if (constructor == null) {
+                        constructor = constructors[0];
+                    }
+
+                    Class<?>[] paramTypes = constructor.getParameterTypes();
+
+                    // Handle constructors with no parameters
+                    if (paramTypes.length == 0) {
+                        T newInstance = (T) constructor.newInstance();
+                        instances.put(serviceClass, newInstance);
+                        logger.info("Successfully resolved service with no dependencies: {}", cls.getName());
+                        return newInstance;
+                    }
+
+                    // Handle constructors with dependencies
+                    T newInstance = (T) constructor.newInstance(new Object[paramTypes.length]);
+                    instances.put(serviceClass, newInstance);
+
+                    // Resolve dependencies for the constructor parameters
+                    Object[] dependencies = new Object[paramTypes.length];
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        dependencies[i] = resolve(paramTypes[i]);
+                    }
+
+                    // Inject dependencies into final fields
+                    Field[] fields = cls.getDeclaredFields();
+                    for (Field field : fields) {
+                        if (java.lang.reflect.Modifier.isFinal(field.getModifiers())) {
+                            field.setAccessible(true);
+                            for (int i = 0; i < paramTypes.length; i++) {
+                                if (field.getType().isAssignableFrom(paramTypes[i])) {
+                                    field.set(newInstance, dependencies[i]);
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
                     logger.info("Successfully resolved service: {}", cls.getName());
-                    return constructor.newInstance(parameters);
-                } catch (CircularDependencyException e) {
-                    throw e;
-                } catch (IllegalStateException e){
-                    logger.error("Service has circular dependencies: {}", cls.getName());
-                    throw e;
+                    return newInstance;
+
                 } catch (Exception e) {
                     logger.error("Failed to resolve service: {}", cls.getName(), e);
                     throw new RuntimeException("Failed to resolve service: " + cls.getName(), e);
                 }
             });
         } finally {
+            // Remove the service from the resolving set to prevent memory leaks
             resolving.get().remove(serviceClass);
         }
     }
-
 
     /**
      * Maps controller routes to the Ember application.

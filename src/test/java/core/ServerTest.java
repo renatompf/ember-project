@@ -7,7 +7,6 @@ import com.sun.net.httpserver.HttpServer;
 import io.ember.core.*;
 import io.ember.enums.HttpMethod;
 import io.ember.enums.HttpStatusCode;
-import io.ember.examples.ServiceExample.middleware.CustomMiddleware;
 import io.ember.exceptions.HttpException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +46,7 @@ class ServerTest {
 
     @BeforeEach
     void setUp() {
-        middleware = List.of(new CustomMiddleware());
+        middleware = List.of();
         server = new Server(router, middleware);
         handlerCaptor = ArgumentCaptor.forClass(HttpHandler.class);
 

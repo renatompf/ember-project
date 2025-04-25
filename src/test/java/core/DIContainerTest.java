@@ -7,7 +7,6 @@ import io.ember.annotations.middleware.WithMiddleware;
 import io.ember.annotations.parameters.QueryParameter;
 import io.ember.annotations.service.Service;
 import io.ember.core.*;
-import io.ember.exceptions.CircularDependencyException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -183,29 +182,149 @@ class DIContainerTest {
         verify(responseHandler).internalServerError(contains("Failed to invoke controller method: handleGet"));
     }
 
-    @Test
-    void fullLifecycle_WithCircularDependency_ShouldThrowException() {
+    @Service
+    public static class TestServiceA {
+        private final TestServiceB serviceB;
+        private String message = "A";
 
-        @Controller("/api/circular")
-         class CircularDependencyController {
-            private final CircularDependencyController dependency;
-
-            public CircularDependencyController(CircularDependencyController dependency) {
-                this.dependency = dependency;
-            }
-
-            @Get("/test")
-            public Response handleGet() {
-                return Response.ok("This should not be reached");
-            }
+        public TestServiceA(TestServiceB serviceB) {
+            this.serviceB = serviceB;
         }
 
-        // Given
-        container.register(CircularDependencyController.class);
+        public String getFromB() {
+            return serviceB.getMessage();
+        }
 
-        // When & Then
-        CircularDependencyException exception = assertThrows(CircularDependencyException.class, () -> container.resolveAll());
-        assertEquals("Circular dependency detected for: " + CircularDependencyController.class.getName(), exception.getMessage());
+        public String getMessage() {
+            return message;
+        }
+
+    }
+
+    @Service
+    public static class TestServiceB {
+        private final TestServiceA serviceA;
+        private String message = "B";
+
+        public TestServiceB(TestServiceA serviceA) {
+            this.serviceA = serviceA;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+    }
+
+    @Service
+    public static class TestServiceC {
+        private final TestServiceA serviceA;
+        private String message = "C";
+
+        public TestServiceC(TestServiceA serviceA) {
+            this.serviceA = serviceA;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    @Service
+    public static class TestServiceD {
+        private String message = "D";
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    @Service
+    public static class TestServiceE {
+        private final TestServiceD serviceD;
+        private String message = "E";
+
+        public TestServiceE(TestServiceD serviceD) {
+            this.serviceD = serviceD;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    @Test
+    void shouldResolveCircularDependencyWithConstructorInjection() {
+        // Register both services
+        container.register(TestServiceA.class);
+        container.register(TestServiceB.class);
+
+        // Resolve the services
+        container.resolveAll();
+
+        // Get instance of ServiceA
+        TestServiceA serviceA = container.resolve(TestServiceA.class);
+
+        // Verify that the circular dependency is resolved
+        assertNotNull(serviceA);
+        assertNotNull(serviceA.serviceB);
+        assertEquals("B", serviceA.getFromB());
+    }
+
+    @Test
+    void shouldResolveComplexCircularDependencyChain() {
+        // Register all services
+        container.register(TestServiceA.class);
+        container.register(TestServiceB.class);
+        container.register(TestServiceC.class);
+
+        // Resolve the services
+        container.resolveAll();
+
+        // Get instances and verify they're properly wired
+        TestServiceA serviceA = container.resolve(TestServiceA.class);
+        TestServiceB serviceB = container.resolve(TestServiceB.class);
+        TestServiceC serviceC = container.resolve(TestServiceC.class);
+
+        // Verify that all services are created
+        assertNotNull(serviceA);
+        assertNotNull(serviceB);
+        assertNotNull(serviceC);
+
+        // Verify the circular chain is properly connected
+        assertSame(serviceB, serviceA.serviceB);
+        assertSame(serviceA, serviceB.serviceA);
+        assertSame(serviceA, serviceC.serviceA);
+
+        // Verify messages to ensure proper initialization
+        assertEquals("A", serviceA.getMessage());
+        assertEquals("B", serviceB.getMessage());
+        assertEquals("C", serviceC.getMessage());
+    }
+
+    @Test
+    void shouldResolveComplexCircularDependencyChainAndClassWithNoConstructor() {
+        // Register all services
+        container.register(TestServiceD.class);
+        container.register(TestServiceE.class);
+
+        // Resolve the services
+        container.resolveAll();
+
+        // Get instances and verify they're properly wired
+        TestServiceD serviceD = container.resolve(TestServiceD.class);
+        TestServiceE serviceE = container.resolve(TestServiceE.class);
+
+        // Verify that all services are created
+        assertNotNull(serviceD);
+        assertNotNull(serviceE);
+
+        // Verify the circular chain is properly connected
+        assertSame(serviceD, serviceE.serviceD);
+
+        // Verify messages to ensure proper initialization
+        assertEquals("D", serviceD.getMessage());
+        assertEquals("D", serviceE.serviceD.getMessage());
     }
 
     @Test
