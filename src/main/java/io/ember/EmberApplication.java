@@ -160,6 +160,34 @@ public class EmberApplication {
     }
 
     /**
+     * Retrieves the router instance used by the application.
+     *
+     * @return The router instance.
+     */
+    public Router getRouter() {
+        return router;
+    }
+
+
+    /**
+     * Retrieves the List of Middleware used by the application.
+     *
+     * @return The list of middleware.
+     */
+    public List<Middleware> getMiddleware() {
+        return middleware;
+    }
+
+    /**
+     * Retrieves the error handler used by the application.
+     *
+     * @return the error handler
+     */
+    public BiConsumer<Context, Exception> getErrorHandler() {
+        return errorHandler;
+    }
+
+    /**
      * Starts the server on the specified port.
      *
      * @param port The port number to start the server on.
