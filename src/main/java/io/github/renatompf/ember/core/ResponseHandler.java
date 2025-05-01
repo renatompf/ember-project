@@ -27,15 +27,6 @@ public class ResponseHandler {
     }
 
     /**
-     * Sends a plain text response with the specified status code.
-     *
-     * @param body       The response body as a string.
-     * @param statusCode The HTTP status code to send.
-     */
-
-    static int count = 0;
-
-    /**
      * Sends a JSON response with the specified status code.
      *
      * @param response The response object to serialize to JSON.
