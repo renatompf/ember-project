@@ -1,6 +1,6 @@
 package core;
 
-import io.ember.core.RoutePattern;
+import io.github.renatompf.ember.core.RoutePattern;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

@@ -1,10 +1,10 @@
 package core;
 
-import io.ember.core.Context;
-import io.ember.core.MiddlewareChain;
-import io.ember.core.RouteMatchResult;
-import io.ember.core.Router;
-import io.ember.enums.HttpMethod;
+import io.github.renatompf.ember.core.Context;
+import io.github.renatompf.ember.core.MiddlewareChain;
+import io.github.renatompf.ember.core.RouteMatchResult;
+import io.github.renatompf.ember.core.Router;
+import io.github.renatompf.ember.enums.HttpMethod;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -101,7 +101,7 @@ class RouterTest {
     @Test
     void getRoute_ShouldMatchOptionalParameters() {
         // Given
-        router.register(HttpMethod.GET, "/users/:id?", _ -> {});
+        router.register(HttpMethod.GET, "/users/:id?", context -> {});
 
         // When
         RouteMatchResult withParam = router.getRoute(HttpMethod.GET, "/users/123");

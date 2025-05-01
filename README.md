@@ -58,11 +58,9 @@ Ember Framework is a lightweight Java web framework designed for building RESTfu
 ## Example
 
 ```java
-package io.ember.examples.middleware;
-
-import io.ember.annotations.middleware.WithMiddleware;
-import io.ember.core.Context;
-import io.ember.annotations.middleware.Middleware;
+import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
+import io.github.renatompf.ember.core.Context;
+import io.github.renatompf.ember.core.Middleware;
 
 // Declare middleware for authentication
 public class AuthMiddleware implements Middleware {
