@@ -5,7 +5,6 @@ import io.github.renatompf.ember.enums.HttpMethod;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -24,9 +23,6 @@ public class EmberApplication {
 
     // Server instance to handle HTTP requests
     private final Server server = new Server(router, middleware);
-
-    // Error handler for handling exceptions during request processing
-    private BiConsumer<Context, Exception> errorHandler;
 
     /**
      * Registers a GET route with the specified path and handler.
@@ -113,53 +109,6 @@ public class EmberApplication {
     }
 
     /**
-     * Registers a route with a custom middleware chain.
-     *
-     * @param method     The HTTP method for the route.
-     * @param path       The path for the route.
-     * @param handler    The handler to process requests to this route.
-     * @param middleware The list of middleware to apply to this route.
-     */
-    public void registerRoute(HttpMethod method, String path, Consumer<Context> handler, List<Middleware> middleware) {
-        router.register(method, path, new MiddlewareChain(middleware, handler));
-    }
-
-    /**
-     * Creates a route group with a common prefix and applies the provided group configuration.
-     *
-     * @param prefix        The common prefix for all routes in the group.
-     * @param groupConsumer A consumer to define the routes and middleware for the group.
-     * @return The current `EmberApplication` instance for method chaining.
-     */
-    public EmberApplication group(String prefix, Consumer<RouteGroup> groupConsumer) {
-        RouteGroup routeGroup = new RouteGroup(prefix, this);
-        groupConsumer.accept(routeGroup);
-        return this;
-    }
-
-    /**
-     * Adds a global middleware to the application.
-     *
-     * @param m The middleware to add.
-     * @return The current `EmberApplication` instance for method chaining.
-     */
-    public EmberApplication use(Middleware m) {
-        middleware.add(m);
-        return this;
-    }
-
-    /**
-     * Sets a custom error handler for handling exceptions during request processing.
-     *
-     * @param handler The error handler to set.
-     * @return The current `EmberApplication` instance for method chaining.
-     */
-    public EmberApplication onError(BiConsumer<Context, Exception> handler) {
-        this.errorHandler = handler;
-        return this;
-    }
-
-    /**
      * Retrieves the router instance used by the application.
      *
      * @return The router instance.
@@ -176,15 +125,6 @@ public class EmberApplication {
      */
     public List<Middleware> getMiddleware() {
         return middleware;
-    }
-
-    /**
-     * Retrieves the error handler used by the application.
-     *
-     * @return the error handler
-     */
-    public BiConsumer<Context, Exception> getErrorHandler() {
-        return errorHandler;
     }
 
     /**
