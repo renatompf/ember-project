@@ -11,46 +11,29 @@ Ember Framework is a lightweight Java web framework designed for building RESTfu
 
 ## Architecture
 
-```markdown
-                  +----------------------------+
-                  |      EmberApplication      | <-- Entry point
-                  +----------------------------+
-                             |
-                             | builds routes, middleware, DI container
-                             v
-                +----------------------------------+
-                |         DIContainer              |
-                |  - Registers services/controllers|
-                |  - Handles constructor injection |
-                +----------------------------------+
-                             |
-                             v
-                  +------------------------+
-                  |        Router          | <-- Path + method to handler
-                  +------------------------+
-                             |
-                             v
-+----------------+     +----------------------+      +-------------------+
-|  Middleware[]  | --> |     MiddlewareChain   | -->  |  Route Handler(s) |
-+----------------+     +----------------------+      +-------------------+
-                             ^
-                             |
-                      +--------------+
-                      |   Server     | <-- Starts and handles HttpServer
-                      +--------------+
-                             |
-                             v
-                     [ Incoming Request ]
-                             |
-                             v
-                 +--------------------------+
-                 |        Context           | <-- Holds request state, response, etc.
-                 +--------------------------+
-                             |
-                             v
-                 +--------------------------+
-                 |     Final Response       |
-                 +--------------------------+
+```mermaid
+flowchart TB
+    G[Server] --> H[Incoming Request]
+    H --> I[Context]
+    I --> D[MiddlewareChain]
+    A[EmberApplication] -->|configures| G
+    A -->|builds| B[DIContainer]
+    B -->|registers| C[Router]
+    B -->|manages| Services[Services]
+    B -->|manages| Controllers[Controllers]
+    E[Middleware] --> D
+    C -->|provides| D
+    D --> F[Route Handlers]
+    F --> J[Final Response]
+%% Add notes/descriptions
+    A --- Note1[Entry point]
+    B --- Note2[Registers services/controllers<br/>Handles constructor injection]
+    C --- Note3[Path + method to handler]
+    G --- Note4[Starts and handles HttpServer]
+    I --- Note5[Holds request state, response, etc.]
+%% Styling
+    classDef note fill: #533, stroke: #533, stroke-width: 2px
+    class Note1, Note2, Note3, Note4, Note5 note
 
 ```
 
