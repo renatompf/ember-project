@@ -54,7 +54,7 @@ public class Server {
         try{
             server = HttpServer.create(new InetSocketAddress(port), 0);
             // Setting the custom executor for handling requests asynchronously
-            server.setExecutor(Executors.newCachedThreadPool());
+            server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
             logger.info("HTTP server created and executor set.");
 
             // Setting up the context for handling requests
@@ -124,15 +124,20 @@ public class Server {
                 fullChain.add(c -> match.middlewareChain().handler().accept(c));
             } else {
                 logger.warn("No route match found for path: {}", context.getPath());
-                fullChain.add(c -> {
-                    c.response().send(HttpStatusCode.NOT_FOUND.getMessage(), HttpStatusCode.NOT_FOUND.getCode());
-                });
+                fullChain.add(c -> c.response().handleResponse(
+                        Response
+                                .status(HttpStatusCode.NOT_FOUND)
+                                .body(HttpStatusCode.NOT_FOUND.getMessage())
+                                .build()));
             }
         } catch (HttpException e) {
             logger.error("HTTP exception occurred while building middleware chain: {}", e.getMessage());
-            fullChain.add(c -> {
-                c.response().send(e.getMessage(), e.getStatus().getCode());
-            });
+            fullChain.add(c -> c.response().handleResponse(
+                    Response
+                            .status(e.getStatus())
+                            .body(e.getMessage())
+                            .build())
+            );
         }
 
         return fullChain;

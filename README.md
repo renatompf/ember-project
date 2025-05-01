@@ -53,11 +53,10 @@ import io.github.renatompf.ember.core.Middleware;
 // Declare middleware for authentication
 public class AuthMiddleware implements Middleware {
     @Override
-    public void handle(Context context) {
-        String token = context.request().getHeader("Authorization");
+    public void handle(Context context) throws Exception {
+        String token = context.headers().header("Authorization");
         if (token == null || !token.equals("valid-token")) {
-            context.response().unauthorized("Invalid or missing token");
-            throw new RuntimeException("Unauthorized");
+            throw new HttpException(HttpStatusCode.UNAUTHORIZED, "Invalid or missing token");
         }
     }
 }
@@ -66,7 +65,7 @@ public class AuthMiddleware implements Middleware {
 public class LoggingMiddleware implements Middleware {
     @Override
     public void handle(Context context) {
-        System.out.println("Request received: " + context.request().getPath());
+        System.out.println("Request received: " + context.getPath());
     }
 }
 
@@ -77,13 +76,13 @@ public class SecureController {
 
     @Get("/data")
     public Response getData() {
-        return Response.ok("Secure data accessed successfully!");
+        return Response.ok().body("Secure data accessed successfully!").build();
     }
 
     @Get("/validate")
     @WithMiddleware(LoggingMiddleware.class)
     public Response validateAndGetData() {
-        return Response.ok("Validation passed, secure data accessed!");
+        return Response.ok().body("Validation passed, secure data accessed!").build();
     }
 }
 ```

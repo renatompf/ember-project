@@ -7,6 +7,8 @@ import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
 import io.github.renatompf.ember.annotations.parameters.QueryParameter;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.core.*;
+import io.github.renatompf.ember.enums.HttpStatusCode;
+import io.github.renatompf.ember.enums.MediaType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,75 +40,6 @@ class DIContainerTest {
     // Static variable to track middleware call count
     public static AtomicInteger middlewareCallCount = new AtomicInteger(0);
 
-    @Controller("/api")
-    public static class TestApiController {
-        @Get("/test")
-        public Response handleGet(@QueryParameter("id") String id) {
-            return Response.ok("Test " + id);
-        }
-    }
-
-    public static class FailingMiddleware implements Middleware {
-        @Override
-        public void handle(Context context) throws Exception {
-            throw new RuntimeException("Middleware failure");
-        }
-    }
-
-    public static class TestMiddleware implements Middleware {
-        @Override
-        public void handle(Context context) {
-            middlewareCallCount.incrementAndGet();
-        }
-    }
-
-    @Controller("/api/middleware")
-    @WithMiddleware(TestMiddleware.class)
-    public static class TestMiddlewareApiController {
-        @Get("/test")
-        @WithMiddleware(TestMiddleware.class)
-        public Response handleGet(@QueryParameter("id") String id) {
-            return Response.ok("Test " + id);
-        }
-
-        @Get("/fail")
-        @WithMiddleware(FailingMiddleware.class)
-        public Response handleFail() {
-            return Response.ok("This should not be reached");
-        }
-    }
-
-    @Service
-    public static class TestDependency {
-        public String getData() {
-            return "test data";
-        }
-    }
-
-    @Controller("/api/service")
-    public static class TestServiceController {
-        private final TestDependency testDependency;
-
-        public TestServiceController(TestDependency testDependency) {
-            this.testDependency = testDependency;
-        }
-
-        @Get("/test")
-        public Response handleGet(@QueryParameter("id") String id) {
-            return Response.ok("Test " + id + " with dependency: " + testDependency.getData());
-        }
-    }
-
-    // ========= End of Test Classes =========
-
-    @BeforeEach
-    void setUp() {
-        container = new DIContainer();
-        lenient().when(context.response()).thenReturn(responseHandler);
-        middlewareCallCount.set(0);
-
-    }
-
     @Test
     void fullLifecycle_WithValidController_ShouldMapAndHandleRequests() {
         // When
@@ -125,7 +58,119 @@ class DIContainerTest {
         handlerCaptor.getValue().accept(context);
 
         // Verify response
-        verify(responseHandler).sendJson("Test 123", 200);
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("Test 123", capturedResponse.getBody());
+        assertTrue(capturedResponse.getContentType().equals(MediaType.APPLICATION_JSON.getType()));
+    }
+
+    public static class FailingMiddleware implements Middleware {
+        @Override
+        public void handle(Context context) throws Exception {
+            throw new RuntimeException("Middleware failure");
+        }
+    }
+
+    public static class TestMiddleware implements Middleware {
+        @Override
+        public void handle(Context context) {
+            middlewareCallCount.incrementAndGet();
+        }
+    }
+
+    @Test
+    void fullLifecycle_WithFailingMiddleware_ShouldHandleError() {
+        // When
+        container.register(TestMiddlewareApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/middleware/fail"), handlerCaptor.capture());
+
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
+        assertEquals("Error: Middleware failure", capturedResponse.getBody());
+
+    }
+
+    @Service
+    public static class TestDependency {
+        public String getData() {
+            return "test data";
+        }
+    }
+
+    @Test
+    void fullLifecycle_WithMissingQueryParameter_ShouldHandleError() {
+
+        // When
+        container.register(TestApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/test"), handlerCaptor.capture());
+        when(context.queryParams()).thenReturn(new QueryParameterManager("")); // Empty query parameters
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
+        assertTrue(capturedResponse.getBody().toString().contains("Failed to invoke controller method: handleGet"));
+    }
+
+    // ========= End of Test Classes =========
+
+    @BeforeEach
+    void setUp() {
+        container = new DIContainer();
+        lenient().when(context.response()).thenReturn(responseHandler);
+        middlewareCallCount.set(0);
+
+    }
+
+    @Test
+    void fullLifecycle_WithServiceDependency_ShouldInjectService() {
+        // Given
+        container.register(TestDependency.class);
+        container.register(TestApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/test"), handlerCaptor.capture());
+
+        // Then simulate request handling
+        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
+
+        // Execute the captured handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("Test 123", capturedResponse.getBody());
+        assertTrue(capturedResponse.getContentType().equals(MediaType.APPLICATION_JSON.getType()));
     }
 
     @Test
@@ -147,39 +192,40 @@ class DIContainerTest {
     }
 
     @Test
-    void fullLifecycle_WithFailingMiddleware_ShouldHandleError() {
-        // When
-        container.register(TestMiddlewareApiController.class);
+    void fullLifecycle_WithServiceDependency_ShouldInjectServiceIntoController() {
+        // Given
+        container.register(TestDependency.class);
+        container.register(TestServiceController.class);
         container.resolveAll();
         container.mapControllerRoutes(app);
 
-        // Capture and execute handler
+        // Capture the route handler
         ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(app).get(eq("/api/middleware/fail"), handlerCaptor.capture());
+        verify(app).get(eq("/api/service/test"), handlerCaptor.capture());
 
+        // Then simulate request handling
+        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
+
+        // Execute the captured handler
         handlerCaptor.getValue().accept(context);
 
-        // Then
-        verify(responseHandler).internalServerError("Error: Middleware failure");
-        verify(responseHandler, never()).sendJson(any(), anyInt());
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("Test 123 with dependency: test data", capturedResponse.getBody());
+        assertTrue(capturedResponse.getContentType().equals(MediaType.APPLICATION_JSON.getType()));
+        ;
     }
 
-    @Test
-    void fullLifecycle_WithMissingQueryParameter_ShouldHandleError() {
-
-        // When
-        container.register(TestApiController.class);
-        container.resolveAll();
-        container.mapControllerRoutes(app);
-
-        // Capture and execute handler
-        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(app).get(eq("/api/test"), handlerCaptor.capture());
-        when(context.queryParams()).thenReturn(new QueryParameterManager("")); // Empty query parameters
-        handlerCaptor.getValue().accept(context);
-
-        // Then
-        verify(responseHandler).internalServerError(contains("Failed to invoke controller method: handleGet"));
+    @Controller("/api")
+    public static class TestApiController {
+        @Get("/test")
+        public Response<String> handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id).build();
+        }
     }
 
     @Service
@@ -327,48 +373,34 @@ class DIContainerTest {
         assertEquals("D", serviceE.serviceD.getMessage());
     }
 
-    @Test
-    void fullLifecycle_WithServiceDependency_ShouldInjectService() {
-        // Given
-        container.register(TestDependency.class);
-        container.register(TestApiController.class);
-        container.resolveAll();
-        container.mapControllerRoutes(app);
+    @Controller("/api/middleware")
+    @WithMiddleware(TestMiddleware.class)
+    public static class TestMiddlewareApiController {
+        @Get("/test")
+        @WithMiddleware(TestMiddleware.class)
+        public Response handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id).build();
+        }
 
-        // Capture the route handler
-        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(app).get(eq("/api/test"), handlerCaptor.capture());
-
-        // Then simulate request handling
-        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
-
-        // Execute the captured handler
-        handlerCaptor.getValue().accept(context);
-
-        // Verify response
-        verify(responseHandler).sendJson("Test 123", 200);
+        @Get("/fail")
+        @WithMiddleware(FailingMiddleware.class)
+        public Response handleFail() {
+            return Response.ok().body("This should not be reached").build();
+        }
     }
 
-    @Test
-    void fullLifecycle_WithServiceDependency_ShouldInjectServiceIntoController() {
-        // Given
-        container.register(TestDependency.class);
-        container.register(TestServiceController.class);
-        container.resolveAll();
-        container.mapControllerRoutes(app);
+    @Controller("/api/service")
+    public static class TestServiceController {
+        private final TestDependency testDependency;
 
-        // Capture the route handler
-        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(app).get(eq("/api/service/test"), handlerCaptor.capture());
+        public TestServiceController(TestDependency testDependency) {
+            this.testDependency = testDependency;
+        }
 
-        // Then simulate request handling
-        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
-
-        // Execute the captured handler
-        handlerCaptor.getValue().accept(context);
-
-        // Verify response
-        verify(responseHandler).sendJson(eq("Test 123 with dependency: test data"), eq(200));
+        @Get("/test")
+        public Response handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id + " with dependency: " + testDependency.getData()).build();
+        }
     }
 
     @Test

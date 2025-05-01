@@ -8,6 +8,9 @@ import io.github.renatompf.ember.annotations.parameters.PathParameter;
 import io.github.renatompf.ember.annotations.parameters.QueryParameter;
 import io.github.renatompf.ember.annotations.parameters.RequestBody;
 import io.github.renatompf.ember.annotations.service.Service;
+import io.github.renatompf.ember.enums.HttpStatusCode;
+import io.github.renatompf.ember.enums.MediaType;
+import io.github.renatompf.ember.exceptions.HttpException;
 import io.github.renatompf.ember.utils.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -340,9 +343,22 @@ public class DIContainer {
 
             // Invoke the controller method
             invokeControllerMethod(controller, method, context);
+        } catch (HttpException e) {
+            logger.error("HTTP Exception: {}", e.getMessage());
+            context.response().handleResponse(
+                    Response
+                            .status(e.getStatus())
+                            .body(e.getMessage())
+                            .build()
+            );
         } catch (Exception e) {
             logger.error("Error while handling middleware or invoking controller method: {}", e.getMessage());
-            context.response().internalServerError("Error: " + e.getMessage());
+            context.response().handleResponse(
+                    Response
+                            .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
+                            .body("Error: " + e.getMessage())
+                            .build()
+            );
         }
     }
 
@@ -383,26 +399,37 @@ public class DIContainer {
 
     /**
      * Handles the result of a controller method invocation and sends the appropriate HTTP response.
-     * <p>
-     * If the result is an instance of `Response`, it sends the response body and status code.
-     * If the result is not null, it sends the result's string representation with a 200 status code.
-     * If the result is null, it sends an empty response with a 204 status code.
      *
      * @param result  The result of the controller method invocation.
      * @param context The HTTP request context used to send the response.
      */
     private void handleControllerResult(Object result, Context context) {
-        if (result instanceof Response response) {
-            logger.debug("Sending response with status code {} and body: {}", response.statusCode(), response.body());
-            context.response().sendJson(response.body(), response.statusCode());
-        } else if (result != null) {
-            logger.debug("Sending response with status code 200 and body: {}", result);
-            context.response().sendJson(result.toString(), 200);
-        } else {
-            logger.debug("Sending empty response with status code 204");
-            context.response().sendJson("", 204);
-        }
+        Response<?> response = convertToResponse(result);
+        logger.debug("Handling response with status code {} and body: {}", response.getStatusCode(), response.getBody());
+        context.response().handleResponse(response);
     }
+
+    /**
+     * Converts any result into a Response object with appropriate status code and body.
+     *
+     * @param result The result to convert
+     * @return A Response object
+     */
+    private Response<?> convertToResponse(Object result) {
+        if (result instanceof Response<?>) {
+            return (Response<?>) result;
+        }
+
+        if (result == null) {
+            return Response.ok().build();
+        }
+
+        return Response.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(result)
+                .build();
+    }
+
 
     /**
      * Resolves a method parameter based on its annotations and type.

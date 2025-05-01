@@ -101,7 +101,9 @@ class ServerTest {
     void start_ShouldHandleMatchingRoute() throws IOException, URISyntaxException {
         // Given
         RouteMatchResult matchResult = new RouteMatchResult(
-                new MiddlewareChain(List.of(), ctx -> ctx.response().ok("Success")),
+                new MiddlewareChain(List.of(), ctx -> ctx.response().handleResponse(
+                        Response.ok().body("Hello World").build()
+                )),
                 Map.of("param", "value")
         );
         when(router.getRoute(any(HttpMethod.class), anyString())).thenReturn(matchResult);
@@ -186,8 +188,8 @@ class ServerTest {
         handler.handle(exchange);
 
         // Then
-        verify(exchange).sendResponseHeaders(eq(400), eq((long)("Bad Request".length())));
-        assertArrayEquals("Bad Request".getBytes(), responseBody.toByteArray());
+        verify(exchange).sendResponseHeaders(eq(400), eq((long) "\"Bad Request\"".length()));
+        assertArrayEquals(("\"Bad Request\"").getBytes(), responseBody.toByteArray());
     }
 
 }
