@@ -1,37 +1,101 @@
 package io.github.renatompf.ember.core;
 
-public record Response(int statusCode, Object body) {
+import io.github.renatompf.ember.enums.HttpStatusCode;
+import io.github.renatompf.ember.enums.MediaType;
 
-    public static Response ok(Object body) {
-        return new Response(200, body);
+public class Response<T> {
+    private final HttpStatusCode statusCode;
+    private final T body;
+    private String contentType = MediaType.APPLICATION_JSON.getType();
+
+    private Response(HttpStatusCode statusCode, String contentType, T body) {
+        this.statusCode = statusCode;
+        this.contentType = contentType;
+        this.body = body;
     }
 
-    public static Response created(Object body) {
-        return new Response(201, body);
+    // Static factory methods for building Response
+    public static <T> Builder<T> status(HttpStatusCode statusCode) {
+        return new Builder<>(statusCode);
     }
 
-    public static Response noContent() {
-        return new Response(204, null);
+    public static <T> Builder<T> ok() {
+        return new Builder<>(HttpStatusCode.OK);
     }
 
-    public static Response badRequest(Object body) {
-        return new Response(400, body);
+    public static <T> Builder<T> created() {
+        return new Builder<>(HttpStatusCode.CREATED);
     }
 
-    public static Response notFound(Object body) {
-        return new Response(404, body);
+    public static <T> Builder<T> badRequest() {
+        return new Builder<>(HttpStatusCode.BAD_REQUEST);
     }
 
-    public static Response internalServerError(Object body) {
-        return new Response(500, body);
+    public static <T> Builder<T> notFound() {
+        return new Builder<>(HttpStatusCode.NOT_FOUND);
     }
 
-    public static Response unauthorized(Object body) {
-        return new Response(401, body);
+    public static <T> Builder<T> noContent() {
+        return new Builder<>(HttpStatusCode.NO_CONTENT);
     }
 
-    public static Response forbidden(Object body) {
-        return new Response(403, body);
+    public static <T> Builder<T> unauthorized() {
+        return new Builder<>(HttpStatusCode.UNAUTHORIZED);
+    }
+
+    public static <T> Builder<T> forbidden() {
+        return new Builder<>(HttpStatusCode.FORBIDDEN);
+    }
+
+    public static <T> Builder<T> internalServerError() {
+        return new Builder<>(HttpStatusCode.INTERNAL_SERVER_ERROR);
+    }
+
+    public HttpStatusCode getStatusCode() {
+        return statusCode;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public T getBody() {
+        return body;
+    }
+
+    @Override
+    public String toString() {
+        return "Response{" +
+                "statusCode=" + statusCode +
+                ", contentType='" + contentType + '\'' +
+                ", body=" + body +
+                '}';
+    }
+
+    public static class Builder<T> {
+        private final HttpStatusCode statusCode;
+        private MediaType contentType = MediaType.APPLICATION_JSON;
+        private T body;
+
+        private Builder(HttpStatusCode statusCode) {
+            this.statusCode = statusCode;
+        }
+
+        public Builder<T> contentType(MediaType contentType) {
+            this.contentType = contentType;
+            return this;
+        }
+
+        public <R> Builder<R> body(R body) {
+            Builder<R> newBuilder = new Builder<>(this.statusCode);
+            newBuilder.contentType(this.contentType);
+            newBuilder.body = body;
+            return newBuilder;
+        }
+
+        public Response<T> build() {
+            return new Response<>(statusCode, contentType.getType(), body);
+        }
     }
 
 }
