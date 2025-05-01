@@ -54,7 +54,7 @@ public class Server {
         try{
             server = HttpServer.create(new InetSocketAddress(port), 0);
             // Setting the custom executor for handling requests asynchronously
-            server.setExecutor(Executors.newCachedThreadPool());
+            server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
             logger.info("HTTP server created and executor set.");
 
             // Setting up the context for handling requests
