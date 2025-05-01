@@ -45,7 +45,7 @@ public class Server {
      * and executing the chain. If an exception occurs during request processing, appropriate HTTP error
      * responses are sent back to the client.
      * <p>
-     * The server uses a cached thread pool executor to handle requests asynchronously.
+     * The server uses a virtual thread pool executor to handle requests asynchronously.
      *
      * @param port The port number on which the server will listen for incoming requests.
      */
