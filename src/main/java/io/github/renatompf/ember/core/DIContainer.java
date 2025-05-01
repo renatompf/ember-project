@@ -410,7 +410,7 @@ public class DIContainer {
     }
 
     /**
-     * Converts any result into a Response object with appropriate status code and body.
+     * Converts any result into a Response object with the appropriate status code and body.
      *
      * @param result The result to convert
      * @return A Response object

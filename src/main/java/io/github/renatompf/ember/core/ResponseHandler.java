@@ -42,6 +42,19 @@ public class ResponseHandler {
         }
     }
 
+    /**
+     * Sends an HTTP response with the specified body and status code.
+     * <p>
+     * This method writes the response body to the output stream of the `HttpExchange`
+     * and sets the appropriate headers. If the `Content-Type` header is not already set,
+     * it defaults to `text/plain`. The response is sent with the provided status code.
+     * <p>
+     * If an `IOException` occurs during the process, a `RuntimeException` is thrown.
+     *
+     * @param body       The response body to send.
+     * @param statusCode The HTTP status code to send.
+     * @throws RuntimeException if an I/O error occurs while sending the response.
+     */
     private void send(String body, int statusCode) {
         try {
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
