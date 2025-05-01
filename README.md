@@ -18,7 +18,7 @@ flowchart TB
     I --> D[MiddlewareChain]
 
     A[EmberApplication] --> |configures| G
-    A --> |builds| B[DIContainer]
+    A --> B[DIContainer]
 
     B --> |registers| C[Router]
     B --> |manages| Services[Services]
