@@ -1,12 +1,12 @@
 package core;
 
-import io.ember.EmberApplication;
-import io.ember.annotations.controller.Controller;
-import io.ember.annotations.http.Get;
-import io.ember.annotations.middleware.WithMiddleware;
-import io.ember.annotations.parameters.QueryParameter;
-import io.ember.annotations.service.Service;
-import io.ember.core.*;
+import io.github.renatompf.ember.EmberApplication;
+import io.github.renatompf.ember.annotations.controller.Controller;
+import io.github.renatompf.ember.annotations.http.Get;
+import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
+import io.github.renatompf.ember.annotations.parameters.QueryParameter;
+import io.github.renatompf.ember.annotations.service.Service;
+import io.github.renatompf.ember.core.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
