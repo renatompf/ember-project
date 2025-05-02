@@ -138,6 +138,14 @@ public class Server {
                             .body(e.getMessage())
                             .build())
             );
+        } catch (Exception e) {
+            logger.error("Unexpected error occurred while building middleware chain.", e);
+            fullChain.add(c -> c.response().handleResponse(
+                    Response
+                            .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
+                            .body(HttpStatusCode.INTERNAL_SERVER_ERROR.getMessage())
+                            .build())
+            );
         }
 
         return fullChain;
@@ -150,6 +158,12 @@ public class Server {
         }
     }
 
-
-
+    /**
+     * Returns the middleware list used by the server.
+     *
+     * @return The list of middleware.
+     */
+    public List<Middleware> getMiddleware() {
+        return middleware;
+    }
 }

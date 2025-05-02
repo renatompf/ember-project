@@ -25,6 +25,9 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static java.lang.reflect.Modifier.isFinal;
+import static java.lang.reflect.Modifier.isStatic;
+
 /**
  * The `DIContainer` class is a simple implementation of a Dependency Injection (DI) container.
  * The container supports automatic resolution of dependencies and prevents circular dependencies.
@@ -120,6 +123,11 @@ public class DIContainer {
      */
     @SuppressWarnings("unchecked")
     public <T> T resolve(Class<T> serviceClass) {
+
+        if (!isRegistered(serviceClass)) {
+            throw new IllegalStateException("Service not registered: " + serviceClass.getName());
+        }
+
         // Check if the service is already resolved
         Object instance = instances.get(serviceClass);
         if (instance != null && instance != UNRESOLVED) {
@@ -149,33 +157,39 @@ public class DIContainer {
                     if (constructors.length == 0) {
                         Field[] fields = cls.getDeclaredFields();
                         boolean hasFieldsToInject = Arrays.stream(fields)
-                                .anyMatch(field -> java.lang.reflect.Modifier.isFinal(field.getModifiers()) &&
-                                        !java.lang.reflect.Modifier.isStatic(field.getModifiers()));
+                                .anyMatch(field -> isFinal(field.getModifiers()) &&
+                                        !isStatic(field.getModifiers()));
 
                         if (!hasFieldsToInject) {
                             // Create an instance using the default constructor
-                            T newInstance = (T) cls.getDeclaredConstructor().newInstance();
+                            Constructor<?> constructor = cls.getDeclaredConstructor();
+                            constructor.setAccessible(true);
+                            T newInstance = (T) constructor.newInstance();
                             instances.put(serviceClass, newInstance);
                             logger.info("Successfully resolved service with default constructor (no dependencies): {}", cls.getName());
                             return newInstance;
+
                         } else {
                             logger.error("Service {} has fields requiring injection but no public constructor", cls.getName());
                             throw new IllegalStateException("Service " + cls.getName() + " has fields requiring injection but no public constructor");
                         }
                     }
 
-                    // Prefer a no-arg constructor if available
                     Constructor<?> constructor = null;
+                    Constructor<?> noArgConstructor = null;
+
                     for (Constructor<?> ctor : constructors) {
                         if (ctor.getParameterCount() == 0) {
+                            noArgConstructor = ctor;
+                        } else {
                             constructor = ctor;
                             break;
                         }
                     }
 
-                    // Use the first constructor if no no-arg constructor is found
+                    // Use constructor with dependencies if available, otherwise use no-arg constructor
                     if (constructor == null) {
-                        constructor = constructors[0];
+                        constructor = noArgConstructor;
                     }
 
                     Class<?>[] paramTypes = constructor.getParameterTypes();
@@ -201,7 +215,7 @@ public class DIContainer {
                     // Inject dependencies into final fields
                     Field[] fields = cls.getDeclaredFields();
                     for (Field field : fields) {
-                        if (java.lang.reflect.Modifier.isFinal(field.getModifiers())) {
+                        if (isFinal(field.getModifiers())) {
                             field.setAccessible(true);
                             for (int i = 0; i < paramTypes.length; i++) {
                                 if (field.getType().isAssignableFrom(paramTypes[i])) {
@@ -217,7 +231,7 @@ public class DIContainer {
 
                 } catch (Exception e) {
                     logger.error("Failed to resolve service: {}", cls.getName(), e);
-                    throw new RuntimeException("Failed to resolve service: " + cls.getName(), e);
+                    throw new RuntimeException("Failed to resolve service: " + cls.getName() + " . Message: " + e.getMessage(), e);
                 }
             });
         } finally {
@@ -441,6 +455,7 @@ public class DIContainer {
      */
     private Object resolveParameter(Parameter parameter, Context context) {
         logger.debug("Resolving parameter {} of type {}", parameter.getName(), parameter.getType().getName());
+
         // Handle path parameters
         PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
         if (pathParam != null) {
@@ -468,6 +483,7 @@ public class DIContainer {
         }
 
         logger.debug("Parameter {} of type {} is not supported", parameter.getName(), parameter.getType().getName());
+
         // Default to null for unsupported parameters
         return null;
     }
