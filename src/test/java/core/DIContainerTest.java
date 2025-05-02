@@ -2,13 +2,16 @@ package core;
 
 import io.github.renatompf.ember.EmberApplication;
 import io.github.renatompf.ember.annotations.controller.Controller;
-import io.github.renatompf.ember.annotations.http.Get;
+import io.github.renatompf.ember.annotations.http.*;
 import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
+import io.github.renatompf.ember.annotations.parameters.PathParameter;
 import io.github.renatompf.ember.annotations.parameters.QueryParameter;
+import io.github.renatompf.ember.annotations.parameters.RequestBody;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.core.*;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
+import io.github.renatompf.ember.exceptions.HttpException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -39,6 +43,24 @@ class DIContainerTest {
 
     // Static variable to track middleware call count
     public static AtomicInteger middlewareCallCount = new AtomicInteger(0);
+
+    @Test
+    void mapControllerRoutes_WithNoControllers_ShouldReturnEarly() {
+        // Given
+        DIContainer container = new DIContainer();
+
+        // When
+        container.mapControllerRoutes(app);
+
+        // Then
+        verify(app, never()).get(anyString(), any());
+        verify(app, never()).post(anyString(), any());
+        verify(app, never()).put(anyString(), any());
+        verify(app, never()).delete(anyString(), any());
+        verify(app, never()).patch(anyString(), any());
+        verify(app, never()).options(anyString(), any());
+        verify(app, never()).head(anyString(), any());
+    }
 
     @Test
     void fullLifecycle_WithValidController_ShouldMapAndHandleRequests() {
@@ -75,6 +97,29 @@ class DIContainerTest {
         }
     }
 
+    @Test
+    void fullLifecycle_WithFailingMiddlewareHttpException_ShouldHandleError() {
+        // When
+        container.register(TestMiddlewareApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/middleware/http-exception"), handlerCaptor.capture());
+
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
+        assertEquals("Error: Middleware failure", capturedResponse.getBody());
+
+    }
+
     public static class TestMiddleware implements Middleware {
         @Override
         public void handle(Context context) {
@@ -103,6 +148,34 @@ class DIContainerTest {
         assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
         assertEquals("Error: Middleware failure", capturedResponse.getBody());
 
+    }
+
+    @Test
+    void fullLifecycle_WithServiceDependency_ShouldInjectServiceIntoController() {
+        // Given
+        container.register(TestDependency.class);
+        container.register(TestServiceController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/service/test"), handlerCaptor.capture());
+
+        // Then simulate request handling
+        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
+
+        // Execute the captured handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("Test 123 with dependency: test data", capturedResponse.getBody());
+        assertEquals(capturedResponse.getContentType(), MediaType.APPLICATION_JSON.getType());
     }
 
     @Service
@@ -192,41 +265,110 @@ class DIContainerTest {
     }
 
     @Test
-    void fullLifecycle_WithServiceDependency_ShouldInjectServiceIntoController() {
-        // Given
-        container.register(TestDependency.class);
-        container.register(TestServiceController.class);
+    void resolveParameter_WithRequestBody() {
+        // Register and set up
+        container.register(TestApiController.class);
         container.resolveAll();
         container.mapControllerRoutes(app);
 
-        // Capture the route handler
+        // Capture handler
         ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
-        verify(app).get(eq("/api/service/test"), handlerCaptor.capture());
+        verify(app).post(eq("/api/body"), handlerCaptor.capture());
 
-        // Then simulate request handling
-        when(context.queryParams()).thenReturn(new QueryParameterManager("id=123"));
+        // Setup body
+        TestDto dto = new TestDto();
+        dto.value = "test-body";
+        BodyManager bodyManager = mock(BodyManager.class);
+        when(context.body()).thenReturn(bodyManager);
+        when(bodyManager.parseBodyAs(TestDto.class)).thenReturn(dto);
 
-        // Execute the captured handler
+        // Execute handler
         handlerCaptor.getValue().accept(context);
 
         // Verify response
         ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
         verify(responseHandler).handleResponse(responseCaptor.capture());
-
-        Response<?> capturedResponse = responseCaptor.getValue();
-        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
-        assertEquals("Test 123 with dependency: test data", capturedResponse.getBody());
-        assertTrue(capturedResponse.getContentType().equals(MediaType.APPLICATION_JSON.getType()));
-        ;
+        assertEquals("Got: test-body", responseCaptor.getValue().getBody());
     }
 
-    @Controller("/api")
-    public static class TestApiController {
-        @Get("/test")
-        public Response<String> handleGet(@QueryParameter("id") String id) {
-            return Response.ok().body("Test " + id).build();
-        }
+    @Test
+    void resolveParameter_WithPathParameter() {
+        // Register and set up
+        container.register(TestApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/test/:param"), handlerCaptor.capture());
+
+        // Setup path parameters
+        Map<String, String> pathParams = Map.of("param", "123");
+        when(context.pathParams()).thenReturn(new PathParameterManager(pathParams));
+
+        // Execute handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+        assertEquals("Got: 123", responseCaptor.getValue().getBody());
     }
+
+    @Test
+    void resolveParameter_WithMissingPathParameter() {
+        // Register and set up
+        container.register(TestApiController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/:id"), handlerCaptor.capture());
+
+        // Setup path parameters with a mismatch between URL parameter and annotation
+        Map<String, String> pathParams = Map.of("id", "123");  // "differentId" is not in the map
+        when(context.pathParams()).thenReturn(new PathParameterManager(pathParams));
+
+        // Execute handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+        assertEquals("Test null", responseCaptor.getValue().getBody());
+    }
+
+    @Test
+    void registerControllers_ShouldRegisterAllControllerClassesInClasspath(){
+        // Given
+        container.registerServices();
+        container.registerControllers();
+        container.resolveAll();
+
+        assertTrue(container.isRegistered(TestApiController.class));
+    }
+
+    @Test
+    void register_WithNonServiceClass_ShouldThrowException() {
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            container.register(NonServiceClass.class);
+        });
+    }
+
+    @Test
+    void resolve_WithMultipleConstructors_ShouldUseAppropriateConstructor() {
+
+        container.register(TestDependency.class);
+        container.register(MultiConstructorService.class);
+        container.resolveAll();
+
+        MultiConstructorService service = container.resolve(MultiConstructorService.class);
+        assertNotNull(service);
+        assertNotNull(service.dependency);
+    }
+
 
     @Service
     public static class TestServiceA {
@@ -373,34 +515,26 @@ class DIContainerTest {
         assertEquals("D", serviceE.serviceD.getMessage());
     }
 
-    @Controller("/api/middleware")
-    @WithMiddleware(TestMiddleware.class)
-    public static class TestMiddlewareApiController {
-        @Get("/test")
-        @WithMiddleware(TestMiddleware.class)
-        public Response handleGet(@QueryParameter("id") String id) {
-            return Response.ok().body("Test " + id).build();
-        }
-
-        @Get("/fail")
-        @WithMiddleware(FailingMiddleware.class)
-        public Response handleFail() {
-            return Response.ok().body("This should not be reached").build();
-        }
+    @Test
+    void resolve_WithNonRegisteredService_ShouldThrowException() {
+        assertThrows(IllegalStateException.class, () -> {
+            container.resolve(TestDependency.class);
+        });
     }
 
-    @Controller("/api/service")
-    public static class TestServiceController {
-        private final TestDependency testDependency;
+    @Test
+    void resolve_WithMultiLevelDependencyChain_ShouldResolveCorrectly() {
+        container.register(TestDependency.class);
+        container.register(Level1Service.class);
+        container.register(Level2Service.class);
+        container.register(Level3Service.class);
+        container.resolveAll();
 
-        public TestServiceController(TestDependency testDependency) {
-            this.testDependency = testDependency;
-        }
-
-        @Get("/test")
-        public Response handleGet(@QueryParameter("id") String id) {
-            return Response.ok().body("Test " + id + " with dependency: " + testDependency.getData()).build();
-        }
+        Level1Service service = container.resolve(Level1Service.class);
+        assertNotNull(service);
+        assertNotNull(service.service);
+        assertNotNull(service.service.service);
+        assertNotNull(service.service.service.dependency);
     }
 
     @Test
@@ -421,12 +555,15 @@ class DIContainerTest {
     }
 
     @Test
-    void registerControllers_ShouldRegisterAllControllerClassesInClasspath(){
-        // Given
-        container.registerControllers();
+    void resolve_WithDifferentRegistrationOrder_ShouldWorkCorrectly() {
+        // Register services in reverse dependency order
+        container.register(TestServiceB.class);
+        container.register(TestServiceA.class);
         container.resolveAll();
 
-        assertTrue(container.isRegistered(TestApiController.class));
+        TestServiceA serviceA = container.resolve(TestServiceA.class);
+        assertNotNull(serviceA);
+        assertNotNull(serviceA.serviceB);
     }
 
     @Test
@@ -437,5 +574,274 @@ class DIContainerTest {
         assertFalse(container.isRegistered(TestDependency.class));
     }
 
-}
+    @Test
+    void resolve_ShouldCreateInstanceWithDefaultConstructor() {
+        // Given
+        DIContainer container = new DIContainer();
+        container.register(TestSimpleService.class);
 
+        // When
+        TestSimpleService service = container.resolve(TestSimpleService.class);
+
+        // Then
+        assertNotNull(service);
+    }
+
+    @Test
+    void mapControllerRoutes_ShouldHandleAllPathCombinations() {
+
+        // Register all controllers
+        container.register(EmptyBaseController.class);
+        container.register(TrailingSlashController.class);
+        container.register(NoTrailingSlashController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Verify all path combinations
+        verify(app).head(eq("/test"), any());  // Empty base + /test
+        verify(app).post(eq("/test"), any()); // Empty base + test
+        verify(app).put(eq("/api/users"), any());   // /api/ + users
+        verify(app).options(eq("/api/users"), any());   // /api/ + /users
+        verify(app).delete(eq("/api/users"), any()); // /api + /users
+        verify(app).patch(eq("/api/users"), any());  // /api + users
+    }
+
+    @Test
+    void mapControllerRoutes_ShouldHandleAllResponseTypes() {
+        // Register and resolve the controller
+        container.register(TestResponseController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handlers for each route
+        ArgumentCaptor<Consumer<Context>> getHandlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Context>> postHandlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        ArgumentCaptor<Consumer<Context>> putHandlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+
+        verify(app).get(eq("/test-api-response/response"), getHandlerCaptor.capture());
+        verify(app).post(eq("/test-api-response/null"), postHandlerCaptor.capture());
+        verify(app).put(eq("/test-api-response/object"), putHandlerCaptor.capture());
+
+        // Test case 1: Result is already a Response object
+        getHandlerCaptor.getValue().accept(context);
+        ArgumentCaptor<Response<?>> responseCaptor1 = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor1.capture());
+        assertEquals("direct response", responseCaptor1.getValue().getBody());
+        assertEquals(HttpStatusCode.OK, responseCaptor1.getValue().getStatusCode());
+
+        // Test case 2: Result is null
+        postHandlerCaptor.getValue().accept(context);
+        ArgumentCaptor<Response<?>> responseCaptor2 = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler, times(2)).handleResponse(responseCaptor2.capture());
+        assertNull(responseCaptor2.getValue().getBody());
+        assertEquals(HttpStatusCode.OK, responseCaptor2.getValue().getStatusCode());
+
+        // Test case 3: Result is a regular object
+        putHandlerCaptor.getValue().accept(context);
+        ArgumentCaptor<Response<?>> responseCaptor3 = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler, times(3)).handleResponse(responseCaptor3.capture());
+        assertEquals("plain string", responseCaptor3.getValue().getBody());
+        assertEquals(HttpStatusCode.OK, responseCaptor3.getValue().getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON.getType(), responseCaptor3.getValue().getContentType());
+    }
+
+    public static class FailingMiddlewareHttpException implements Middleware {
+        @Override
+        public void handle(Context context) throws Exception {
+            throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, "Error: Middleware failure");
+        }
+    }
+
+    public static class TestDto {
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+    }
+
+    @Controller("/api")
+    public static class TestApiController {
+        @Get("/test")
+        public Response<String> handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id).build();
+        }
+
+        @Get("/test/:param")
+        public Response<String> handleGetPathParameter(@PathParameter("param") String param) {
+            return Response.ok().body("Got: " + param).build();
+        }
+
+        @Get("/:id")
+        public Response<String> handleGetDifferentPathParameter(@PathParameter("differentId") String id) {
+            return Response.ok().body("Test " + (id == null ? "null" : id)).build();
+        }
+
+
+        @Post("/body")
+        public Response<String> handlePost(@RequestBody TestDto body) {
+            return Response.ok().body("Got: " + body.getValue()).build();
+        }
+
+    }
+
+    @Controller("/api/middleware")
+    @WithMiddleware(TestMiddleware.class)
+    public static class TestMiddlewareApiController {
+        @Get("/test")
+        @WithMiddleware(TestMiddleware.class)
+        public Response<String> handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id).build();
+        }
+
+        @Get("/fail")
+        @WithMiddleware(FailingMiddleware.class)
+        public Response<String> handleFail() {
+            return Response.ok().body("This should not be reached").build();
+        }
+
+        @Get("/http-exception")
+        @WithMiddleware(FailingMiddlewareHttpException.class)
+        public Response<String> handleFailHttpException() {
+            return Response.ok().body("This should not be reached").build();
+        }
+    }
+
+    @Controller("/api/service")
+    public static class TestServiceController {
+        private final TestDependency testDependency;
+
+        public TestServiceController(TestDependency testDependency) {
+            this.testDependency = testDependency;
+        }
+
+        @Get("/test")
+        public Response<String> handleGet(@QueryParameter("id") String id) {
+            return Response.ok().body("Test " + id + " with dependency: " + testDependency.getData()).build();
+        }
+    }
+
+    public static class NonServiceClass {
+    }
+
+    @Service
+    public static class MultiConstructorService {
+        private final TestDependency dependency;
+
+        public MultiConstructorService() {
+            this.dependency = null;
+        }
+
+        public MultiConstructorService(TestDependency dependency) {
+            this.dependency = dependency;
+        }
+    }
+
+    @Service
+    public static class Level1Service {
+        private final Level2Service service;
+
+        public Level1Service(Level2Service service) {
+            this.service = service;
+        }
+    }
+
+    @Service
+    public static class Level2Service {
+        private final Level3Service service;
+
+        public Level2Service(Level3Service service) {
+            this.service = service;
+        }
+    }
+
+    @Service
+    public static class Level3Service {
+        private final TestDependency dependency;
+
+        public Level3Service(TestDependency dependency) {
+            this.dependency = dependency;
+        }
+    }
+
+    @Service
+    public static class TestSimpleService {
+        private String nonFinalField;
+
+        TestSimpleService() {
+        }
+    }
+
+    @Controller
+    public static class EmptyBaseController {
+        @Head("/test")
+        public void testSlash() {
+        }
+
+        @Post("test")
+        public void testNoSlash() {
+        }
+    }
+
+    @Controller("/api/")
+    public static class TrailingSlashController {
+        @Options("/users")
+        public void testWithSlash() {
+        }
+
+        @Put("users")
+        public void testWithoutSlash() {
+        }
+    }
+
+    @Controller("/api")
+    public static class NoTrailingSlashController {
+        @Delete("/users")
+        public void testWithSlash() {
+        }
+
+        @Patch("users")
+        public void testWithoutSlash() {
+        }
+    }
+
+    @Controller("/test-api-response")
+    public static class TestResponseController {
+        @Get("/response")
+        public Response<String> returnsResponse() {
+            return Response.ok().body("direct response").build();
+        }
+
+        @Post("/null")
+        public Object returnsNull() {
+            return null;
+        }
+
+        @Put("/object")
+        public String returnsObject() {
+            return "plain string";
+        }
+    }
+
+
+//    @Service
+//    public static class ServiceWithFinalField {
+//        private final String requiredField;
+//        private ServiceWithFinalField() {
+//            this.requiredField = "";
+//        }
+//    }
+//
+//    @Test
+//    void resolve_ShouldThrowException_WhenServiceHasFinalFieldsButNoPublicConstructor() {
+//        // Given
+//        DIContainer container = new DIContainer();
+//        container.register(ServiceWithFinalField.class);
+//
+//        // When/Then
+//        RuntimeException exception = assertThrows(RuntimeException.class,
+//                () -> container.resolve(ServiceWithFinalField.class));
+//        assertTrue(exception.getMessage().contains("has fields requiring injection but no public constructor"));
+//    }
+
+}
