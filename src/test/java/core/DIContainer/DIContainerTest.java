@@ -1,4 +1,4 @@
-package core;
+package core.DIContainer;
 
 import io.github.renatompf.ember.EmberApplication;
 import io.github.renatompf.ember.annotations.controller.Controller;
@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DIContainerTest {
+
     private DIContainer container;
 
     @Mock
@@ -43,6 +44,14 @@ class DIContainerTest {
 
     // Static variable to track middleware call count
     public static AtomicInteger middlewareCallCount = new AtomicInteger(0);
+
+    @BeforeEach
+    void setUp() {
+        container = new DIContainer("core.DIContainer");
+        lenient().when(context.response()).thenReturn(responseHandler);
+        middlewareCallCount.set(0);
+
+    }
 
     @Test
     void mapControllerRoutes_WithNoControllers_ShouldReturnEarly() {
@@ -206,16 +215,6 @@ class DIContainerTest {
         Response<?> capturedResponse = responseCaptor.getValue();
         assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
         assertTrue(capturedResponse.getBody().toString().contains("Failed to invoke controller method: handleGet"));
-    }
-
-    // ========= End of Test Classes =========
-
-    @BeforeEach
-    void setUp() {
-        container = new DIContainer();
-        lenient().when(context.response()).thenReturn(responseHandler);
-        middlewareCallCount.set(0);
-
     }
 
     @Test
@@ -540,6 +539,7 @@ class DIContainerTest {
     @Test
     void registerServices_ShouldRegisterAllServiceClassesInClasspath(){
         // Given
+        DIContainer container = new DIContainer("core.DIContainer");
         container.registerServices();
         container.resolveAll();
 
@@ -822,26 +822,5 @@ class DIContainerTest {
             return "plain string";
         }
     }
-
-
-//    @Service
-//    public static class ServiceWithFinalField {
-//        private final String requiredField;
-//        private ServiceWithFinalField() {
-//            this.requiredField = "";
-//        }
-//    }
-//
-//    @Test
-//    void resolve_ShouldThrowException_WhenServiceHasFinalFieldsButNoPublicConstructor() {
-//        // Given
-//        DIContainer container = new DIContainer();
-//        container.register(ServiceWithFinalField.class);
-//
-//        // When/Then
-//        RuntimeException exception = assertThrows(RuntimeException.class,
-//                () -> container.resolve(ServiceWithFinalField.class));
-//        assertTrue(exception.getMessage().contains("has fields requiring injection but no public constructor"));
-//    }
 
 }
