@@ -98,6 +98,8 @@ Access the secure endpoint at `http://localhost:8080/secure/data` and `http://lo
 - `@PathParameter`: Binds a path parameter to a method argument.
 - `@QueryParameter`: Binds a query parameter to a method argument.
 - `@RequestBody`: Binds the request body to a method argument.
+- `@GlobalHandler`: Marks class as a global exception handler.
+- `@Handles`: Marks a method to handle a specific exception.
 
 ### Middleware
 Use `@WithMiddleware` to apply middleware globally or to specific routes.
