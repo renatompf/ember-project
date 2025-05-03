@@ -34,6 +34,12 @@ import static java.lang.reflect.Modifier.isStatic;
  */
 public class DIContainer {
 
+    /**
+     * The base package to scan for service and controller classes.
+     * If not set, the container will scan the entire classpath.
+     */
+    private String basePackage = "";
+
     private static final Logger logger = LoggerFactory.getLogger(DIContainer.class);
 
     // Map to store registered service classes and their instances
@@ -44,6 +50,21 @@ public class DIContainer {
 
     // Marker object to indicate that a service is registered but not yet resolved
     private static final Object UNRESOLVED = new Object();
+
+    /**
+     * Default constructor to create a DIContainer without a specific base package.
+     */
+    public DIContainer() {
+    }
+
+    /**
+     * Constructor to create a DIContainer with a specific base package.
+     *
+     * @param basePackage The base package to scan for service and controller classes.
+     */
+    public DIContainer(String basePackage) {
+        this.basePackage = basePackage;
+    }
 
     /**
      * Registers a service class in the container.
@@ -535,11 +556,12 @@ public class DIContainer {
      * @throws ClassNotFoundException if a class cannot be loaded.
      * @throws IOException            if an error occurs while reading resources.
      */
-    private static List<Class<?>> findServices() throws ClassNotFoundException, IOException {
-        logger.info("Finding all service classes in the classpath");
+    private List<Class<?>> findServices() throws ClassNotFoundException, IOException {
+        logger.info("Finding all service classes in the base package: {}", basePackage);
         List<Class<?>> serviceClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        var resources = classLoader.getResources(""); // Empty string gets all resources
+        String path = basePackage.replace('.', '/');
+        var resources = classLoader.getResources(path);
 
         while (resources.hasMoreElements()) {
             var resource = resources.nextElement();
@@ -547,24 +569,23 @@ public class DIContainer {
             var file = new File(resource.getFile());
             if (file.isDirectory()) {
                 logger.debug("Scanning directory: {}", file.getAbsolutePath());
-                serviceClasses.addAll(findClassesInDirectory(file, "", Service.class));
+                serviceClasses.addAll(findClassesInDirectory(file, basePackage, Service.class));
             } else if (resource.getProtocol().equals("jar")) {
+                logger.debug("Resource is a JAR file: {}", resource.getPath());
                 var jarFilePath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
-                logger.debug("Resource is a JAR file: {}", jarFilePath);
                 try (var jarFile = new java.util.jar.JarFile(jarFilePath)) {
                     var entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
                         var entry = entries.nextElement();
-                        if (entry.getName().endsWith(".class")) {
+                        if (entry.getName().startsWith(path) && entry.getName().endsWith(".class")) {
                             var className = entry.getName().replace('/', '.').substring(0, entry.getName().length() - 6);
                             try {
-                                var clazz = Class.forName(className, false, classLoader); // Don't initialize yet
+                                var clazz = Class.forName(className, false, classLoader);
                                 if (clazz.isAnnotationPresent(Service.class)) {
                                     logger.debug("Found service class: {}", clazz.getName());
                                     serviceClasses.add(clazz);
                                 }
                             } catch (NoClassDefFoundError | UnsupportedClassVersionError ignored) {
-                                // Log or handle errors as needed
                                 logger.error("Failed to load class: {}", className);
                             }
                         }
@@ -573,7 +594,7 @@ public class DIContainer {
             }
         }
 
-        logger.info("Completed finding @Service classes. Total found: {}", serviceClasses.size());
+        logger.info("Completed finding @Service classes in base package. Total found: {}", serviceClasses.size());
         return serviceClasses;
     }
 
@@ -584,19 +605,21 @@ public class DIContainer {
      * @throws ClassNotFoundException if a class cannot be loaded.
      * @throws IOException            if an error occurs while reading resources.
      */
-    private static List<Class<?>> findControllers() throws ClassNotFoundException, IOException {
-        logger.info("Finding all controller classes in the classpath");
+    private List<Class<?>> findControllers() throws ClassNotFoundException, IOException {
+        logger.info("Finding all controller classes in the base package: {}", basePackage);
         List<Class<?>> controllerClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        var resources = classLoader.getResources(""); // Empty string gets all resources
+        String path = basePackage.replace('.', '/');
+        var resources = classLoader.getResources(path);
 
         while (resources.hasMoreElements()) {
             var resource = resources.nextElement();
+            System.out.println("Resource: " + resource);
             logger.debug("Found resource: {}", resource);
             var file = new File(resource.getFile());
             if (file.isDirectory()) {
                 logger.debug("Scanning directory: {}", file.getAbsolutePath());
-                controllerClasses.addAll(findClassesInDirectory(file, "", Controller.class));
+                controllerClasses.addAll(findClassesInDirectory(file, basePackage, Controller.class));
             } else if (resource.getProtocol().equals("jar")) {
                 logger.debug("Resource is a JAR file: {}", resource.getPath());
                 var jarFilePath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
@@ -604,10 +627,10 @@ public class DIContainer {
                     var entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
                         var entry = entries.nextElement();
-                        if (entry.getName().endsWith(".class")) {
+                        if (entry.getName().startsWith(path) && entry.getName().endsWith(".class")) {
                             var className = entry.getName().replace('/', '.').substring(0, entry.getName().length() - 6);
                             try {
-                                var clazz = Class.forName(className, false, classLoader); // Don't initialize yet
+                                var clazz = Class.forName(className, false, classLoader);
                                 if (clazz.isAnnotationPresent(Controller.class)) {
                                     logger.debug("Found controller class: {}", clazz.getName());
                                     controllerClasses.add(clazz);
@@ -620,7 +643,8 @@ public class DIContainer {
                 }
             }
         }
-        logger.info("Completed finding @Controller classes. Total found: {}", controllerClasses.size());
+
+        logger.info("Completed finding @Controller classes in base package. Total found: {}", controllerClasses.size());
         return controllerClasses;
     }
 
@@ -633,7 +657,7 @@ public class DIContainer {
      * @return A list of service classes.
      * @throws ClassNotFoundException if a class cannot be loaded.
      */
-    private static <A extends Annotation> List<Class<?>> findClassesInDirectory(
+    private <A extends Annotation> List<Class<?>> findClassesInDirectory(
             File directory,
             String packageName,
             Class<A> annotationType) throws ClassNotFoundException {
