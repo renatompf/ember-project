@@ -2,6 +2,8 @@ package core.DIContainer;
 
 import io.github.renatompf.ember.EmberApplication;
 import io.github.renatompf.ember.annotations.controller.Controller;
+import io.github.renatompf.ember.annotations.exceptions.GlobalHandler;
+import io.github.renatompf.ember.annotations.exceptions.Handles;
 import io.github.renatompf.ember.annotations.http.*;
 import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
 import io.github.renatompf.ember.annotations.parameters.PathParameter;
@@ -19,6 +21,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -125,8 +129,11 @@ class DIContainerTest {
 
         Response<?> capturedResponse = responseCaptor.getValue();
         assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
-        assertEquals("Error: Middleware failure", capturedResponse.getBody());
+        assertTrue(capturedResponse.getBody() instanceof ErrorResponse);
 
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
+        assertEquals("Error: Middleware failure", error.getMessage());
     }
 
     public static class TestMiddleware implements Middleware {
@@ -155,8 +162,14 @@ class DIContainerTest {
 
         Response<?> capturedResponse = responseCaptor.getValue();
         assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
-        assertEquals("Error: Middleware failure", capturedResponse.getBody());
+        assertTrue(capturedResponse.getBody() instanceof ErrorResponse);
 
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
+        assertEquals("Middleware failure", error.getMessage());
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, error.getStatus());
+        assertNotNull(error.getTimestamp());
+        assertTrue(error.getException().contains("RuntimeException"));
     }
 
     @Test
@@ -196,7 +209,6 @@ class DIContainerTest {
 
     @Test
     void fullLifecycle_WithMissingQueryParameter_ShouldHandleError() {
-
         // When
         container.register(TestApiController.class);
         container.resolveAll();
@@ -214,7 +226,11 @@ class DIContainerTest {
 
         Response<?> capturedResponse = responseCaptor.getValue();
         assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, capturedResponse.getStatusCode());
-        assertTrue(capturedResponse.getBody().toString().contains("Failed to invoke controller method: handleGet"));
+
+        assertTrue(capturedResponse.getBody() instanceof ErrorResponse);
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, error.getStatus());
+        assertEquals("Missing query parameter: id", error.getMessage());
     }
 
     @Test
@@ -822,5 +838,204 @@ class DIContainerTest {
             return "plain string";
         }
     }
+
+    @Test
+    void handleException_WithRegisteredHandler_ShouldUseCustomHandler() {
+        // Given
+        container.register(TestExceptionHandler.class);
+        container.register(TestExceptionController.class);
+        container.resolveAll();  // Resolve instances first
+        container.registerExceptionHandlers();  // Now check for handler instances
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/exception/custom"), handlerCaptor.capture());
+
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> response = responseCaptor.getValue();
+
+        assertTrue(response.getBody() instanceof ErrorResponse);
+        ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+        assertEquals(HttpStatusCode.BAD_REQUEST, response.getStatusCode());
+        assertTrue(errorResponse.getMessage().contains("Custom error"));
+        assertEquals("/api/exception/custom", errorResponse.getPath());
+        assertEquals(CustomTestException.class.getName(), errorResponse.getException());
+    }
+
+    @Test
+    void handleException_WithHttpException_ShouldHandleCorrectly() {
+        // Given
+        container.register(TestExceptionHandler.class);
+        container.register(TestExceptionController.class);
+        container.resolveAll();
+        container.registerExceptionHandlers();
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/exception/http"), handlerCaptor.capture());
+
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> response = responseCaptor.getValue();
+
+        assertTrue(response.getBody() instanceof ErrorResponse);
+        ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+        assertEquals(HttpStatusCode.FORBIDDEN, response.getStatusCode());
+        assertEquals("Access denied", errorResponse.getMessage());
+        assertEquals("/api/exception/http", errorResponse.getPath());
+        assertEquals(HttpException.class.getName(), errorResponse.getException());
+    }
+
+    @Test
+    void handleException_WithUnhandledException_ShouldUseDefaultHandling() {
+        // When
+        container.register(TestExceptionController.class);
+        container.resolveAll();
+        container.registerExceptionHandlers();
+        container.mapControllerRoutes(app);
+
+        // Capture and execute handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/exception/unhandled"), handlerCaptor.capture());
+
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> response = responseCaptor.getValue();
+
+        assertTrue(response.getBody() instanceof ErrorResponse);
+        ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+
+        assertEquals(HttpStatusCode.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals("Unhandled error", errorResponse.getMessage());
+        assertNull(errorResponse.getPath());
+        assertEquals(RuntimeException.class.getName(), errorResponse.getException());
+    }
+
+    @Test
+    void registerGlobalHandlers_ShouldRegisterHandlerClasses() {
+        // Given
+        DIContainer container = new DIContainer("core.DIContainer");
+
+        // When
+        container.registerGlobalHandlers();
+
+        // Then
+        assertTrue(container.isRegistered(TestExceptionHandler.class));
+    }
+
+    @Test
+    void registerGlobalHandlers_WithInvalidPath_ShouldNotFindAnyHandlers() throws Exception {
+        // Given
+        DIContainer container = new DIContainer("invalid.package.path");
+
+        // When
+        container.registerGlobalHandlers();
+
+        // Then
+        Method findHandlers = DIContainer.class.getDeclaredMethod("findHandlers");
+        findHandlers.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Class<?>> result = (List<Class<?>>) findHandlers.invoke(container);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findHandlers_ShouldFindAnnotatedClasses() throws Exception {
+        // Given
+        DIContainer container = new DIContainer("core.DIContainer");
+
+        // When
+        Method findHandlers = DIContainer.class.getDeclaredMethod("findHandlers");
+        findHandlers.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Class<?>> result = (List<Class<?>>) findHandlers.invoke(container);
+
+        // Then
+        assertFalse(result.isEmpty());
+        assertTrue(result.contains(TestExceptionHandler.class));
+        assertTrue(result.stream()
+                .allMatch(clazz -> clazz.isAnnotationPresent(GlobalHandler.class)));
+    }
+
+    @Test
+    void findHandlers_WithNoHandlers_ShouldReturnEmptyList() throws Exception {
+        // Given
+        DIContainer container = new DIContainer("core.utils");
+
+        // When
+        Method findHandlers = DIContainer.class.getDeclaredMethod("findHandlers");
+        findHandlers.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Class<?>> result = (List<Class<?>>) findHandlers.invoke(container);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    private static class CustomTestException extends Exception {
+        public CustomTestException(String message) {
+            super(message);
+        }
+    }
+
+    @GlobalHandler
+    private static class TestExceptionHandler {
+        @Handles(CustomTestException.class)
+        public Response<ErrorResponse> handleCustomException(CustomTestException ex) {
+            return Response.status(HttpStatusCode.BAD_REQUEST)
+                    .body(new ErrorResponse(
+                            HttpStatusCode.BAD_REQUEST,
+                            ex.getMessage(),
+                            "/api/exception/custom",
+                            ex.getClass().getName()))
+                    .build();
+        }
+
+        @Handles(HttpException.class)
+        public Response<ErrorResponse> handleHttpException(HttpException ex) {
+            return Response.status(ex.getStatus())
+                    .body(new ErrorResponse(
+                            ex.getStatus(),
+                            ex.getMessage(),
+                            "/api/exception/http",
+                            ex.getClass().getName()))
+                    .build();
+        }
+    }
+
+    @Controller("/api/exception")
+    public static class TestExceptionController {
+        @Get("/custom")
+        public Response<String> throwCustomException() throws CustomTestException {
+            System.out.println("Throwing custom exception");
+            throw new CustomTestException("Custom error");
+        }
+
+        @Get("/http")
+        public Response<String> throwHttpException() {
+            throw new HttpException(HttpStatusCode.FORBIDDEN, "Access denied");
+        }
+
+        @Get("/unhandled")
+        public Response<String> throwUnhandledException() {
+            throw new RuntimeException("Unhandled error");
+        }
+    }
+
 
 }
