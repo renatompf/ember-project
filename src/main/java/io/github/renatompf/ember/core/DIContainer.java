@@ -2,6 +2,7 @@ package io.github.renatompf.ember.core;
 
 import io.github.renatompf.ember.EmberApplication;
 import io.github.renatompf.ember.annotations.controller.Controller;
+import io.github.renatompf.ember.annotations.exceptions.GlobalHandler;
 import io.github.renatompf.ember.annotations.http.*;
 import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
 import io.github.renatompf.ember.annotations.parameters.PathParameter;
@@ -10,7 +11,6 @@ import io.github.renatompf.ember.annotations.parameters.RequestBody;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
-import io.github.renatompf.ember.exceptions.HttpException;
 import io.github.renatompf.ember.utils.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -39,6 +36,12 @@ public class DIContainer {
      * If not set, the container will scan the entire classpath.
      */
     private String basePackage = "";
+
+    /**
+     * The exception handler registry for handling exceptions in the application.
+     * This registry is used to register and find exception handlers based on the type of exception thrown.
+     */
+    private ExceptionHandlerRegistry exceptionHandlerRegistry;
 
     private static final Logger logger = LoggerFactory.getLogger(DIContainer.class);
 
@@ -75,7 +78,9 @@ public class DIContainer {
      * @throws IllegalArgumentException if the class is not annotated with `@Service`.
      */
     public <T> void register(Class<T> serviceClass) {
-        if (serviceClass.isAnnotationPresent(Service.class) || serviceClass.isAnnotationPresent(Controller.class)) {
+        if (serviceClass.isAnnotationPresent(Service.class) ||
+                serviceClass.isAnnotationPresent(Controller.class) ||
+                serviceClass.isAnnotationPresent(GlobalHandler.class)) {
             instances.put(serviceClass, UNRESOLVED); // Mark as registered
             logger.info("Registered service: {}", serviceClass.getName());
         } else {
@@ -119,6 +124,42 @@ public class DIContainer {
             throw new RuntimeException("Failed to register controllers", e);
         }
     }
+
+    /**
+     * Automatically registers all global handler classes found in the classpath.
+     * Only classes annotated with `@GlobalHandler` are registered.
+     *
+     * @throws RuntimeException if an error occurs during global handler registration.
+     */
+    public void registerGlobalHandlers() {
+        try {
+            List<Class<?>> handlerClasses = findHandlers();
+            logger.info("Found {} global handler classes", handlerClasses.size());
+            for (Class<?> handlerClass : handlerClasses) {
+                register(handlerClass);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to register global handlers", e);
+        }
+    }
+
+
+    /**
+     * Registers exception handlers from the global handler class.
+     * This method scans for classes annotated with `@GlobalHandler` and registers their methods
+     * as exception handlers in the application.
+     */
+    public void registerExceptionHandlers() {
+        for (Map.Entry<Class<?>, Object> entry : instances.entrySet()) {
+            Object instance = entry.getValue();
+            if (instance != null && instance.getClass().isAnnotationPresent(GlobalHandler.class)) {
+                this.exceptionHandlerRegistry = new ExceptionHandlerRegistry(instance);
+                logger.info("Registered exception handlers from: {}", instance.getClass().getName());
+                return;  // Once we find a handler, we can return
+            }
+        }
+    }
+
 
     /**
      * Resolves all registered services by instantiating them and their dependencies.
@@ -378,24 +419,63 @@ public class DIContainer {
 
             // Invoke the controller method
             invokeControllerMethod(controller, method, context);
-        } catch (HttpException e) {
-            logger.error("HTTP Exception: {}", e.getMessage());
-            context.response().handleResponse(
-                    Response
-                            .status(e.getStatus())
-                            .body(e.getMessage())
-                            .build()
-            );
         } catch (Exception e) {
-            logger.error("Error while handling middleware or invoking controller method: {}", e.getMessage());
-            context.response().handleResponse(
-                    Response
-                            .status(HttpStatusCode.INTERNAL_SERVER_ERROR)
-                            .body("Error: " + e.getMessage())
-                            .build()
-            );
+            handleException(e, context);
         }
     }
+
+    /**
+     * Handles exceptions that occur during the execution of controller methods.
+     * This method attempts to find a registered exception handler for the given exception
+     * and invokes it if found. If no handler is found, a default error response is sent.
+     *
+     * @param e       The exception that occurred.
+     * @param context The HTTP request context used to send the response.
+     */
+    private void handleException(Throwable e, Context context) {
+        logger.debug("Handling exception: {}", e.getMessage());
+
+        // First, unwrap any RuntimeException to get the actual cause
+        Throwable actualException = e;
+        while (actualException instanceof RuntimeException && actualException.getCause() != null) {
+            actualException = actualException.getCause();
+        }
+
+        if (exceptionHandlerRegistry != null) {
+            logger.debug("Exception handler registry: {}", exceptionHandlerRegistry.getClass().getName());
+            try {
+                ExceptionHandlerMethod handler = exceptionHandlerRegistry.findHandler(actualException);
+                if (handler != null) {
+                    logger.debug("Found exception handler: {}", handler);
+                    Object result = handler.invoke(actualException, context);
+                    logger.debug("Invoking exception handler with result: {}", result);
+                    if (result != null) {
+                        logger.debug("Handling exception with result: {}", result);
+                        Response<?> response = convertToResponse(result);
+                        context.response().handleResponse(response);
+                        return;
+                    }
+                    logger.debug("No result from exception handler, sending default error response");
+                }
+            } catch (Exception handlerException) {
+                logger.error("Error in exception handler", handlerException);
+            }
+        }
+
+        // Default error handling if no specific handler is found
+        logger.debug("No exception handler found, sending default error response");
+        context.response().handleResponse(
+                Response.status(HttpStatusCode.INTERNAL_SERVER_ERROR)
+                        .body(new ErrorResponse(
+                                HttpStatusCode.INTERNAL_SERVER_ERROR,
+                                actualException.getMessage(),  // Use the actual exception message
+                                context.getPath(),
+                                actualException.getClass().getName()))  // Use the actual exception class
+                        .build()
+        );
+    }
+
+
 
     /**
      * Invokes a controller method with the provided context.
@@ -422,11 +502,16 @@ public class DIContainer {
                 logger.debug("Resolved parameter {} of method {}.{} to {}", i, controller.getClass().getName(), method.getName(), args[i]);
             }
 
-            Object result = method.invoke(controller, args);
-            logger.debug("Controller method {}.{} returned: {}", controller.getClass().getName(), method.getName(), result);
-            handleControllerResult(result, context);
-            return result;
-        } catch (Exception e) {
+            try {
+                Object result = method.invoke(controller, args);
+                logger.debug("Controller method {}.{} returned: {}", controller.getClass().getName(), method.getName(), result);
+                handleControllerResult(result, context);
+                return result;
+            } catch (InvocationTargetException e) {
+                // Unwrap the actual exception thrown by the method
+                throw e.getCause();
+            }
+        } catch (Throwable e) {
             logger.error("Failed to invoke controller method: {}.{} - {}", controller.getClass().getName(), method.getName(), e.getMessage());
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
         }
@@ -557,7 +642,7 @@ public class DIContainer {
      * @throws IOException            if an error occurs while reading resources.
      */
     private List<Class<?>> findServices() throws ClassNotFoundException, IOException {
-        logger.info("Finding all service classes in the base package: {}", basePackage);
+        logger.debug("Finding all service classes in the base package: {}", basePackage);
         List<Class<?>> serviceClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = basePackage.replace('.', '/');
@@ -606,7 +691,7 @@ public class DIContainer {
      * @throws IOException            if an error occurs while reading resources.
      */
     private List<Class<?>> findControllers() throws ClassNotFoundException, IOException {
-        logger.info("Finding all controller classes in the base package: {}", basePackage);
+        logger.debug("Finding all controller classes in the base package: {}", basePackage);
         List<Class<?>> controllerClasses = new ArrayList<>();
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         String path = basePackage.replace('.', '/');
@@ -647,6 +732,53 @@ public class DIContainer {
         logger.info("Completed finding @Controller classes in base package. Total found: {}", controllerClasses.size());
         return controllerClasses;
     }
+
+    /**
+     * Finds all classes annotated with `@GlobalHandler` in the classpath.
+     *
+     * @return A list of global handler classes.
+     * @throws ClassNotFoundException if a class cannot be loaded.
+     * @throws IOException            if an error occurs while reading resources.
+     */
+    private List<Class<?>> findHandlers() throws ClassNotFoundException, IOException {
+        logger.info("Finding all global handler classes in the base package: {}", basePackage);
+        List<Class<?>> handlerClasses = new ArrayList<>();
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        String path = basePackage.replace('.', '/');
+        var resources = classLoader.getResources(path);
+
+        while (resources.hasMoreElements()) {
+            var resource = resources.nextElement();
+            var file = new File(resource.getFile());
+            if (file.isDirectory()) {
+                handlerClasses.addAll(findClassesInDirectory(file, basePackage, GlobalHandler.class));
+            } else if (resource.getProtocol().equals("jar")) {
+                logger.info("Resource is a JAR file: {}", resource.getPath());
+                var jarFilePath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
+                try (var jarFile = new java.util.jar.JarFile(jarFilePath)) {
+                    var entries = jarFile.entries();
+                    while (entries.hasMoreElements()) {
+                        var entry = entries.nextElement();
+                        if (entry.getName().startsWith(path) && entry.getName().endsWith(".class")) {
+                            var className = entry.getName().replace('/', '.').substring(0, entry.getName().length() - 6);
+                            try {
+                                var clazz = Class.forName(className, false, classLoader);
+                                if (clazz.isAnnotationPresent(GlobalHandler.class)) {
+                                    logger.info("Found global handler class: {}", clazz.getName());
+                                    handlerClasses.add(clazz);
+                                }
+                            } catch (NoClassDefFoundError | UnsupportedClassVersionError ignored) {
+                                logger.info("Failed to load class: {}", className);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return handlerClasses;
+    }
+
 
     /**
      * Recursively finds all classes in a directory and its subdirectories.
