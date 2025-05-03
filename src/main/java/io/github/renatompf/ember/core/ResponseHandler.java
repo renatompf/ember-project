@@ -2,6 +2,8 @@ package io.github.renatompf.ember.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sun.net.httpserver.HttpExchange;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.enums.RequestHeader;
@@ -15,7 +17,9 @@ public class ResponseHandler {
     private final HttpExchange exchange;
 
     // A static ObjectMapper instance for JSON serialization
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     /**
      * Constructs a ResponseHandler with the given HttpExchange.

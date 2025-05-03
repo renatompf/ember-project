@@ -141,9 +141,17 @@ public class EmberApplication {
         // Controllers are responsible for handling HTTP requests and defining routes.
         diContainer.registerControllers();
 
+        // Register all global handlers in the DI container
+        // Global handlers are used to handle exceptions and other cross-cutting concerns.
+        diContainer.registerGlobalHandlers();
+
         // Resolve all services to ensure they are instantiated and their dependencies are satisfied.
         // This step validates the DI container's configuration.
         diContainer.resolveAll();
+
+        // Register all handlers in the DI container.
+        // Handlers are used to process specific types of requests or exceptions.
+        diContainer.registerExceptionHandlers();
 
         // Map all routes defined in the controllers to the router.
         // This step binds the routes to their respective handlers in the application.
