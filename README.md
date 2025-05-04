@@ -42,7 +42,7 @@ flowchart TB
 
 %% Styling
     classDef note fill:#533,stroke:#533,stroke-width:2px
-class Note1, Note2, Note3, Note4, Note5, Note6 note
+    class Note1,Note2,Note3,Note4,Note5,Note6 note
 ```
 
 
