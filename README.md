@@ -23,11 +23,14 @@ flowchart TB
     B --> |registers| C[Router]
     B --> |manages| Services[Services]
     B --> |manages| Controllers[Controllers]
+    B -->|manages| Handlers[GlobalHandlers]
 
     E[Middleware] --> D
     C --> |provides| D
     D --> F[Route Handlers]
     F --> J[Final Response]
+    Handlers --> K[Exception Handling]
+    K --> J
 
 %% Add notes/descriptions
     A --- Note1[Entry point]
@@ -35,11 +38,11 @@ flowchart TB
     C --- Note3[Path + method to handler]
     G --- Note4[Starts and handles HttpServer]
     I --- Note5[Holds request state, response, etc.]
+    K --- Note6[Handles exceptions using @Handles methods]
 
 %% Styling
     classDef note fill:#533,stroke:#533,stroke-width:2px
-    class Note1,Note2,Note3,Note4,Note5 note
-    
+class Note1, Note2, Note3, Note4, Note5, Note6 note
 ```
 
 
