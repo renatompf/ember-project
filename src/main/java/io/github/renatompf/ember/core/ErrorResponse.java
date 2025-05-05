@@ -18,6 +18,11 @@ public class ErrorResponse {
     private final LocalDateTime timestamp;
     private final String exception;
 
+    /**
+     * Constructs an ErrorResponse with the specified status code.
+     *
+     * @param status The HTTP status code.
+     */
     public ErrorResponse(HttpStatusCode status) {
         this.status = status;
         this.message = status.getMessage();
@@ -26,6 +31,12 @@ public class ErrorResponse {
         this.exception = null;
     }
 
+    /**
+     * Constructs an ErrorResponse with the specified status code and message.
+     *
+     * @param status  The HTTP status code.
+     * @param message The error message.
+     */
     public ErrorResponse(HttpStatusCode status, String message) {
         this.status = status;
         this.message = message;
@@ -34,6 +45,13 @@ public class ErrorResponse {
         this.exception = null;
     }
 
+    /**
+     * Constructs an ErrorResponse with the specified status code, message, and request path.
+     *
+     * @param status  The HTTP status code.
+     * @param message The error message.
+     * @param path    The request path that caused the error.
+     */
     public ErrorResponse(HttpStatusCode status, String message, String path) {
         this.status = status;
         this.message = message;
@@ -42,6 +60,13 @@ public class ErrorResponse {
         this.exception = null;
     }
 
+    /**
+     * Constructs an ErrorResponse with the specified status code, message, and exception.
+     *
+     * @param status     The HTTP status code.
+     * @param message    The error message.
+     * @param exception  The exception that caused the error.
+     */
     public ErrorResponse(HttpStatusCode status, String message, Exception exception) {
         this.status = status;
         this.message = message;
@@ -50,6 +75,14 @@ public class ErrorResponse {
         this.exception = exception.getClass().getName();
     }
 
+    /**
+     * Constructs an ErrorResponse with the specified status code, message, request path, and exception.
+     *
+     * @param status     The HTTP status code.
+     * @param message    The error message.
+     * @param path       The request path that caused the error.
+     * @param exception  The exception that caused the error.
+     */
     public ErrorResponse(HttpStatusCode status, String message, String path, String exception) {
         this.status = status;
         this.message = message;
@@ -58,26 +91,56 @@ public class ErrorResponse {
         this.exception = exception;
     }
 
+    /**
+     * Returns the HTTP status code.
+     *
+     * @return The HTTP status code as an HttpStatusCode object.
+     */
     public HttpStatusCode getStatus() {
         return status;
     }
 
+    /**
+     * Returns the error message.
+     *
+     * @return The error message as a string.
+     */
     public String getMessage() {
         return message;
     }
 
+    /**
+     * Returns the request path that caused the error.
+     *
+     * @return The request path as a string.
+     */
     public String getPath() {
         return path;
     }
 
+    /**
+     * Returns the timestamp of when the error occurred.
+     *
+     * @return The timestamp as a LocalDateTime object.
+     */
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
 
+    /**
+     * Returns the exception type that caused the error.
+     *
+     * @return The exception type as a string.
+     */
     public String getException() {
         return exception;
     }
 
+    /**
+     * Returns a string representation of the ErrorResponse object.
+     *
+     * @return A string representation of the ErrorResponse object.
+     */
     @Override
     public String toString() {
         return "ErrorResponse{" +

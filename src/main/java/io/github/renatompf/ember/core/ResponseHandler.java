@@ -12,6 +12,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Handles HTTP responses for the Ember framework.
+ * <p>
+ * This class is responsible for sending JSON and plain text responses to the client.
+ * It uses Jackson for JSON serialization and manages HTTP headers appropriately.
+ * </p>
+ */
 public class ResponseHandler {
     // The HTTP exchange object used to send and receive HTTP data
     private final HttpExchange exchange;

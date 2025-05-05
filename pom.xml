@@ -8,6 +8,29 @@
     <artifactId>ember</artifactId>
     <version>1.0.0</version>
 
+    <name>Ember Framework</name>
+    <description>Ember Framework is a lightweight Java web framework designed for building RESTful APIs with simplicity and flexibility. It provides features like dependency injection, middleware support, request validation, and annotation-based development to streamline the creation of modern web applications. </description>
+    <url>https://github.com/renatompf/ember-project</url>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>renatompf</id>
+            <name>Renato Freire</name>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/renatompf/ember-project.git</connection>
+        <developerConnection>scm:git:ssh://github.com:renatompf/ember-project.git</developerConnection>
+        <url>https://github.com/renatompf/ember-project/tree/master</url>
+    </scm>
+
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -22,6 +45,10 @@
         <mockito-core.version>5.17.0</mockito-core.version>
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.3</maven-surefire-plugin.version>
+        <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
+        <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
     </properties>
 
     <dependencies>
@@ -38,7 +65,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${jackson-datatype-jsr310.version}</version> <!-- Match your Jackson version -->
+            <version>${jackson-datatype-jsr310.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -109,6 +136,66 @@
                         -Xshare:off
                     </argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>${central-publishing-maven-plugin.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                    <waitUntil>uploaded</waitUntil>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>${maven-gpg-plugin.version}</version>
+                <configuration>
+                    <gpgArguments>
+                        <arg>--pinentry-mode</arg>
+                        <arg>loopback</arg>
+                    </gpgArguments>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

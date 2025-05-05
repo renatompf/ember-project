@@ -17,6 +17,13 @@ public class SessionManager {
      * Retrieves the session associated with the given session ID.
      * If the session does not exist, a new one is created.
      *
+     */
+    public SessionManager() {}
+
+    /**
+     * Retrieves the session associated with the given session ID.
+     * If the session does not exist, a new one is created.
+     *
      * @param sessionId The unique identifier for the session.
      * @return A map representing the session attributes.
      */

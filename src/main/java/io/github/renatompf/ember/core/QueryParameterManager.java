@@ -15,7 +15,7 @@ public class QueryParameterManager {
     /**
      * Constructs a QueryParameterManager with the given query string.
      *
-     * @param query The query string to parse (e.g., "key1=value1&key2=value2").
+     * @param query The query string to parse (e.g., "key1=value1&amp;key2=value2").
      */
     public QueryParameterManager(String query) {
         this.queryParams = parseQueryParams(query);

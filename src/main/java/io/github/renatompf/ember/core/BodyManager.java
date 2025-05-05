@@ -6,12 +6,22 @@ import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.exceptions.HttpException;
 
+/**
+ * BodyManager is responsible for parsing the request body based on its content type.
+ * It supports JSON, XML, and plain text formats.
+ */
 public class BodyManager {
     private final String body;
     private final String contentType;
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     private static final XmlMapper xmlMapper = new XmlMapper();
 
+    /**
+     * Constructs a BodyManager with the given body and content type.
+     *
+     * @param body        The request body as a string.
+     * @param contentType The content type of the request body.
+     */
     public BodyManager(String body, String contentType) {
         this.body = body;
         this.contentType = contentType;

@@ -47,5 +47,10 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Handles {
+    /**
+     * The exception types that this method can handle.
+     *
+     * @return An array of exception classes.
+     */
     Class<? extends Throwable>[] value();
 }

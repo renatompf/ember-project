@@ -13,12 +13,26 @@ public class ExceptionHandlerMethod {
     private final Object handler;
     private final Method method;
 
+    /**
+     * Constructs an ExceptionHandlerMethod with the specified handler and method.
+     *
+     * @param handler The instance of the controller advice.
+     * @param method  The method that handles exceptions.
+     */
     public ExceptionHandlerMethod(Object handler, Method method) {
         this.handler = handler;
         this.method = method;
         this.method.setAccessible(true);
     }
 
+    /**
+     * Invokes the exception handler method with the given exception and context.
+     *
+     * @param exception The exception to be handled.
+     * @param context   The context in which the exception occurred.
+     * @return The result of the method invocation.
+     * @throws Exception If an error occurs during method invocation.
+     */
     public Object invoke(Throwable exception, Context context) throws Exception {
         try {
             Class<?>[] paramTypes = method.getParameterTypes();

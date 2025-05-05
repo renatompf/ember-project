@@ -7,6 +7,18 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Represents a route pattern used for matching and extracting parameters from paths.
+ * This class is responsible for converting a raw path string into a regex pattern
+ * and extracting parameter names from the path.
+ *<p>
+ * The constructor processes the raw path as follows:
+ * <ul>
+ *   <li>Segments starting with `:` are treated as single-segment parameters and matched with `([^/]+)`.</li>
+ *   <li>Segments starting with `*` are treated as multi-segment parameters and matched with `(.*)`.</li>
+ *   <li>Other segments are treated as literal strings and escaped using `Pattern.quote`.</li>
+ * </ul>
+ */
 public class RoutePattern {
     private final String rawPath;
     private final Pattern pattern;
@@ -20,9 +32,11 @@ public class RoutePattern {
      *                or `*param` for multi-segment parameters).
      *<p>
      * The constructor processes the raw path as follows:
-     * <ul>- Segments starting with `:` are treated as single-segment parameters and matched with `([^/]+)`. </ul>
-     * <ul>- Segments starting with `*` are treated as multi-segment parameters and matched with `(.*)`. </ul>
-     * <ul> - Other segments are treated as literal strings and escaped using `Pattern.quote`. </ul>
+     * <ul>
+     *   <li>Segments starting with `:` are treated as single-segment parameters and matched with `([^/]+)`.</li>
+     *   <li>Segments starting with `*` are treated as multi-segment parameters and matched with `(.*)`.</li>
+     *   <li>Other segments are treated as literal strings and escaped using `Pattern.quote`.</li>
+     * </ul>
      *<p>
      * The resulting regex pattern is compiled and stored in the `pattern` field.
      * Parameter names are extracted and stored in the `parameterNames` list.
@@ -64,6 +78,7 @@ public class RoutePattern {
     /**
      * Returns the regex pattern used for matching paths.
      *
+     * @param path The path string to match against the regex pattern.
      * @return The regex pattern as a `Pattern` object.
      */
     public boolean matches(String path) {

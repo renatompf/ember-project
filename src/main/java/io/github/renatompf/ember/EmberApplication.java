@@ -25,6 +25,12 @@ public class EmberApplication {
     private final Server server = new Server(router, middleware);
 
     /**
+     * Constructs a new `EmberApplication` instance.
+     * Initializes the router, DI container, and server.
+     */
+    public EmberApplication() {}
+
+    /**
      * Registers a GET route with the specified path and handler.
      *
      * @param path    The path for the route.
