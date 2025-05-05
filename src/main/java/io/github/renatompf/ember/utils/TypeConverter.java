@@ -8,6 +8,14 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 
+/**
+ * Utility class for converting string values to various types.
+ * <p>
+ * This class provides a method to convert a string value to a specified target type.
+ * It supports a variety of types, including primitive types and their wrapper classes,
+ * as well as common Java types like UUID, LocalDate, LocalDateTime, and Date.
+ * </p>
+ */
 public class TypeConverter {
 
     /**
@@ -39,6 +47,11 @@ public class TypeConverter {
             Map.entry(Instant.class, Instant::parse),
             Map.entry(Date.class, TypeConverter::parseDate)
     );
+
+    /**
+     * Private constructor to prevent instantiation.
+     */
+    private TypeConverter(){}
 
     /**
      * Converts a string value to the specified target type.

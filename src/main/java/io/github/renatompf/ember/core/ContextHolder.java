@@ -5,6 +5,12 @@ package io.github.renatompf.ember.core;
  * This ensures that each thread has its own isolated instance of the {@link Context}.
  */
 public class ContextHolder {
+
+    /**
+     * Default constructor for the ContextHolder class.
+     */
+    public ContextHolder() {}
+
     /**
      * Thread-local variable to store the {@link Context} for the current thread.
      */

@@ -21,6 +21,13 @@ public class Router {
     private final List<RouteEntry> routes = new ArrayList<>();
 
     /**
+     * Default constructor for the Router class.
+     * <p>
+     * Initializes an empty list of routes.
+     */
+    public Router() {}
+
+    /**
      * Registers a route with the specified HTTP method, path, and handler.
      *
      * @param method  The HTTP method for the route (e.g., GET, POST).
@@ -59,7 +66,6 @@ public class Router {
      * </ul>
      * If a match is found, it returns a `RouteMatchResult` containing the middleware chain
      * and any extracted parameters. If no match is found, `null` is returned.
-     * </p>
      *
      * @param method The HTTP method of the request (e.g., GET, POST, DELETE).
      * @param path   The path of the request (e.g., `/example/get`).

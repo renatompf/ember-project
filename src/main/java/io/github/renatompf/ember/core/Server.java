@@ -18,6 +18,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
+/**
+ * Represents an HTTP server that handles incoming requests and routes them to the appropriate handlers.
+ * <p>
+ * The server uses a router to determine the correct route for each request and applies middleware
+ * to process requests and responses. It can be started on a specified port and can be stopped when no longer needed.
+ */
 public class Server {
 
     private static final Logger logger = LoggerFactory.getLogger(Server.class);
@@ -26,6 +32,16 @@ public class Server {
     private final List<Middleware> middleware;
     private HttpServer server;
 
+    /**
+     * Constructs a new Server instance with the specified router and middleware.
+     * <p>
+     * This constructor initializes the server with a router for handling routes
+     * and a list of middleware to be applied to incoming requests.
+     * If no context middleware is provided, it adds a default ContextMiddleware.
+     *
+     * @param router    The router instance for managing routes.
+     * @param middleware A list of middleware to be applied to requests.
+     */
     public Server(Router router, List<Middleware> middleware) {
         this.router = router;
         this.middleware = new ArrayList<>(middleware);
@@ -151,6 +167,11 @@ public class Server {
         return fullChain;
     }
 
+    /**
+     * Stops the HTTP server.
+     * <p>
+     * This method stops the server and releases any resources associated with it.
+     */
     public void stop() {
         if (server != null) {
             server.stop(0);

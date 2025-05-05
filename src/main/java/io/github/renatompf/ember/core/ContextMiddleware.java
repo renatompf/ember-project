@@ -7,6 +7,11 @@ package io.github.renatompf.ember.core;
 public class ContextMiddleware implements Middleware {
 
     /**
+     * Default constructor for the ContextMiddleware class.
+     */
+    public ContextMiddleware() {}
+
+    /**
      * Handles the middleware logic by setting the context, proceeding to the next middleware,
      * and ensuring the context is cleared after processing.
      *
