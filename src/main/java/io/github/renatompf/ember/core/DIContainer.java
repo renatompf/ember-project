@@ -11,6 +11,7 @@ import io.github.renatompf.ember.annotations.parameters.RequestBody;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
+import io.github.renatompf.ember.enums.RequestHeader;
 import io.github.renatompf.ember.utils.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,9 @@ public class DIContainer {
 
     // Marker object to indicate that a service is registered but not yet resolved
     private static final Object UNRESOLVED = new Object();
+
+    // ContentNegotiationManager to handle content negotiation for HTTP requests and responses
+    private final ContentNegotiationManager contentNegotiationManager = new ContentNegotiationManager();
 
     /**
      * Default constructor to create a DIContainer without a specific base package.
@@ -403,6 +407,11 @@ public class DIContainer {
                     ? method.getAnnotation(WithMiddleware.class).value()
                     : new Class[0];
 
+            // Validate content type
+            contentNegotiationManager.validateContentType(context, method);
+            MediaType responseType = contentNegotiationManager.negotiateResponseType(context, method);
+            context.headers().setHeader(RequestHeader.CONTENT_TYPE.getHeaderName(), responseType.getType());
+
             // Execute controller-level middleware
             for (Class<? extends Middleware> middlewareClass : controllerMiddleware) {
                 logger.debug("Executing controller-level middleware: {}", middlewareClass.getName());
@@ -474,7 +483,6 @@ public class DIContainer {
                         .build()
         );
     }
-
 
 
     /**

@@ -171,6 +171,14 @@ public enum HttpStatusCode {
     METHOD_NOT_ALLOWED(405, "Method Not Allowed"),
 
     /**
+     * HTTP 406 Not Acceptable.
+     * <p>
+     * The server cannot produce a response matching the list of acceptable values defined in the request's proactive content negotiation headers.
+     * </p>
+     */
+    NOT_ACCEPTABLE(406, "Not Acceptable"),
+
+    /**
      * HTTP 415 Unsupported Media Type.
      * <p>
      * The media format of the requested data is not supported by the server.

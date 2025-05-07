@@ -80,6 +80,22 @@ public enum MediaType {
     }
 
     /**
+     * Retrieves the MediaType enum corresponding to the given string representation.
+     *
+     * @param type The string representation of the media type.
+     * @return The corresponding MediaType enum, or null if not found.
+     */
+    public static MediaType fromString(String type) {
+        for (MediaType mediaType : values()) {
+            if (mediaType.type.equalsIgnoreCase(type)) {
+                return mediaType;
+            }
+        }
+        return null;
+    }
+
+
+    /**
      * Returns the string representation of the media type.
      *
      * @return The string representation of the media type.
