@@ -1,6 +1,8 @@
 package core.DIContainer;
 
 import io.github.renatompf.ember.EmberApplication;
+import io.github.renatompf.ember.annotations.content.Consumes;
+import io.github.renatompf.ember.annotations.content.Produces;
 import io.github.renatompf.ember.annotations.controller.Controller;
 import io.github.renatompf.ember.annotations.exceptions.GlobalHandler;
 import io.github.renatompf.ember.annotations.exceptions.Handles;
@@ -13,6 +15,7 @@ import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.core.*;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
+import io.github.renatompf.ember.enums.RequestHeader;
 import io.github.renatompf.ember.exceptions.HttpException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +55,15 @@ class DIContainerTest {
     @BeforeEach
     void setUp() {
         container = new DIContainer("core.DIContainer");
+
+        HeadersManager headersManager = mock(HeadersManager.class);
+        lenient().when(headersManager.header("Content-Type")).thenReturn(MediaType.APPLICATION_JSON.getType());
+        lenient().when(headersManager.header("Accept")).thenReturn(MediaType.APPLICATION_JSON.getType());
+
+        // Configure Context mock
+        lenient().when(context.headers()).thenReturn(headersManager);
         lenient().when(context.response()).thenReturn(responseHandler);
+
         middlewareCallCount.set(0);
 
     }
@@ -1037,5 +1048,102 @@ class DIContainerTest {
         }
     }
 
+    @Controller("/api/content")
+    public static class TestNegotiationContentController {
+        @Post
+        @Consumes(MediaType.APPLICATION_JSON)
+        public void consumeJson() {}
+
+        @Get
+        @Produces(MediaType.APPLICATION_JSON)
+        public void produceJson() {}
+
+        @Get("/consume-and-produce")
+        @Consumes(MediaType.APPLICATION_JSON)
+        @Produces(MediaType.APPLICATION_JSON)
+        public void consumeAndProduce() {}
+    }
+
+    @Test
+    void validateContentType_WithValidContentType_ShouldPass() throws NoSuchMethodException {
+        Method method = TestNegotiationContentController.class.getDeclaredMethod("consumeJson");
+        Context context = mock(Context.class);
+        HeadersManager headers = mock(HeadersManager.class);
+
+        when(context.headers()).thenReturn(headers);
+        when(headers.header("Content-Type")).thenReturn(MediaType.APPLICATION_JSON.getType());
+
+        ContentNegotiationManager manager = new ContentNegotiationManager();
+        assertDoesNotThrow(() -> manager.validateContentType(context, method));
+    }
+
+    @Test
+    void validateContentType_WithInvalidContentType_ShouldThrowException() throws NoSuchMethodException {
+        Method method = TestNegotiationContentController.class.getDeclaredMethod("consumeJson");
+        Context context = mock(Context.class);
+        HeadersManager headers = mock(HeadersManager.class);
+
+        when(context.headers()).thenReturn(headers);
+        when(headers.header("Content-Type")).thenReturn(MediaType.APPLICATION_XML.getType());
+
+        ContentNegotiationManager manager = new ContentNegotiationManager();
+        assertThrows(HttpException.class, () -> manager.validateContentType(context, method));
+    }
+
+    @Test
+    void negotiateResponseType_WithValidAcceptHeader_ShouldReturnMediaType() throws NoSuchMethodException {
+        Method method = TestNegotiationContentController.class.getDeclaredMethod("produceJson");
+        Context context = mock(Context.class);
+        HeadersManager headers = mock(HeadersManager.class);
+
+        when(context.headers()).thenReturn(headers);
+        when(headers.header("Accept")).thenReturn(MediaType.APPLICATION_JSON.getType());
+
+        ContentNegotiationManager manager = new ContentNegotiationManager();
+        MediaType result = manager.negotiateResponseType(context, method);
+
+        assertEquals(MediaType.APPLICATION_JSON, result);
+    }
+
+    @Test
+    void negotiateResponseType_WithUnsupportedAcceptHeader_ShouldThrowException() throws NoSuchMethodException {
+
+        Method method = TestNegotiationContentController.class.getDeclaredMethod("produceJson");
+        Context context = mock(Context.class);
+        HeadersManager headers = mock(HeadersManager.class);
+
+        when(context.headers()).thenReturn(headers);
+        when(headers.header("Accept")).thenReturn(MediaType.APPLICATION_XML.getType());
+
+        ContentNegotiationManager manager = new ContentNegotiationManager();
+        assertThrows(HttpException.class, () -> manager.negotiateResponseType(context, method));
+    }
+
+    @Test
+    void handleWithMiddleware_ShouldValidateAndNegotiateContentType() throws Exception {
+        // Register and resolve the controller
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Verify that the route is mapped
+        verify(app).post(eq("/api/content/"), any());
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).post(eq("/api/content/"), handlerCaptor.capture());
+
+        // Mock headers for content negotiation
+        HeadersManager headersManager = mock(HeadersManager.class);
+        lenient().when(context.headers()).thenReturn(headersManager);
+        lenient().when(headersManager.header("Content-Type")).thenReturn(MediaType.APPLICATION_JSON.getType());
+        lenient().when(headersManager.header("Accept")).thenReturn(MediaType.APPLICATION_JSON.getType());
+
+        // Execute the handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify that the response has the correct content type
+        verify(headersManager).setHeader(RequestHeader.CONTENT_TYPE.getHeaderName(), MediaType.APPLICATION_JSON.getType());
+    }
 
 }
