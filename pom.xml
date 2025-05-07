@@ -6,7 +6,7 @@
 
     <groupId>io.github.renatompf</groupId>
     <artifactId>ember</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 
     <name>Ember Framework</name>
     <description>Ember Framework is a lightweight Java web framework designed for building RESTful APIs with simplicity and flexibility. It provides features like dependency injection, middleware support, request validation, and annotation-based development to streamline the creation of modern web applications. </description>
