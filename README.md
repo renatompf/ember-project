@@ -28,7 +28,9 @@ flowchart TB
     E[Middleware] --> D
     C --> |provides| D
     D --> F[Route Handlers]
-    F --> J[Final Response]
+    F --> R[Response]
+    R --> RH[ResponseHandler]
+    RH --> |serializes based on<br/>content type| J[Final Response]
     Handlers --> K[Exception Handling]
     K --> J
 
@@ -39,10 +41,11 @@ flowchart TB
     G --- Note4[Starts and handles HttpServer]
     I --- Note5[Holds request state, response, etc.]
     K --- Note6[Handles exceptions using @Handles methods]
+RH --- Note7[Handles content negotiation<br/>and serialization]
 
 %% Styling
-    classDef note fill:#533,stroke:#533,stroke-width:2px
-    class Note1,Note2,Note3,Note4,Note5,Note6 note
+classDef note fill:#533,stroke:#533,stroke-width:2px
+class Note1,Note2,Note3,Note4,Note5,Note6,Note7 note
 ```
 
 
@@ -101,12 +104,14 @@ Access the secure endpoint at `http://localhost:8080/secure/data` and `http://lo
 - `@PathParameter`: Binds a path parameter to a method argument.
 - `@QueryParameter`: Binds a query parameter to a method argument.
 - `@RequestBody`: Binds the request body to a method argument.
+- `@WithMiddleware`: Applies middleware to a controller or method.
 - `@GlobalHandler`: Marks class as a global exception handler.
 - `@Handles`: Marks a method to handle a specific exception.
+- `@Consumes`: Specifies the content type that a method can consume.
+- `@Produces`: Specifies the content type that a method can produce.
 
 ### Middleware
 Use `@WithMiddleware` to apply middleware globally or to specific routes.
-
 
 ## Contributing
 Contributions are welcome! Please follow these steps:
