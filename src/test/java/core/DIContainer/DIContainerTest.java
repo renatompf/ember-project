@@ -20,6 +20,7 @@ import io.github.renatompf.ember.enums.RequestHeader;
 import io.github.renatompf.ember.exceptions.HttpException;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.validator.constraints.Length;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1085,6 +1086,17 @@ class DIContainerTest {
         public Response<String> testNoValidation(@RequestBody ValidateDto dto) {
             return Response.ok().body("Not Validate").build();
         }
+
+        @Get("/test-validation/:id")
+        public Response<String> testValidationWithPath(@NotNull @NotBlank @Length(min = 5, max = 10) @PathParameter("id") String id) {
+            return Response.ok().body(id).build();
+        }
+
+        @Get("/test-validation")
+        public Response<String> testValidationWithQuery(@NotNull @NotBlank @Length(min = 5, max = 10) @QueryParameter("id") String id) {
+            return Response.ok().body(id).build();
+        }
+
     }
 
 
@@ -1211,7 +1223,7 @@ class DIContainerTest {
         verify(app).post(eq("/api/content/test-validation"), handlerCaptor.capture());
 
         // Setup invalid DTO
-        ValidateDto invalidDto = new ValidateDto(); // Missing required value
+        ValidateDto invalidDto = new ValidateDto();
         BodyManager bodyManager = mock(BodyManager.class);
         when(context.body()).thenReturn(bodyManager);
         when(bodyManager.parseBodyAs(ValidateDto.class)).thenReturn(invalidDto);
@@ -1225,7 +1237,7 @@ class DIContainerTest {
 
         Response<?> capturedResponse = responseCaptor.getValue();
         assertEquals(HttpStatusCode.BAD_REQUEST, capturedResponse.getStatusCode());
-        assertTrue(capturedResponse.getBody() instanceof ErrorResponse);
+        assertInstanceOf(ErrorResponse.class, capturedResponse.getBody());
 
         ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
         assertEquals(HttpStatusCode.BAD_REQUEST, error.getStatus());
@@ -1257,6 +1269,120 @@ class DIContainerTest {
         verify(responseHandler).handleResponse(responseCaptor.capture());
         assertEquals("Not Validate", responseCaptor.getValue().getBody());
         assertEquals(HttpStatusCode.OK, responseCaptor.getValue().getStatusCode());
+    }
+
+    @Test
+    void testValidationWithPath_ShouldValidateAndReturnId() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/content/test-validation/:id"), handlerCaptor.capture());
+
+        // Setup path parameters
+        Map<String, String> pathParams = Map.of("id", "validId");
+        when(context.pathParams()).thenReturn(new PathParameterManager(pathParams));
+
+        // When
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("validId", capturedResponse.getBody());
+    }
+
+    @Test
+    void testValidationWithPath_ShouldValidateInvalidInputAndReturnBadRequest() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/content/test-validation/:id"), handlerCaptor.capture());
+
+        // Setup path parameters
+        Map<String, String> pathParams = Map.of("id", "id");
+        when(context.pathParams()).thenReturn(new PathParameterManager(pathParams));
+
+        // When
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertInstanceOf(ErrorResponse.class, capturedResponse.getBody());
+
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.BAD_REQUEST, error.getStatus());
+        assertNotNull(error.getMessage());
+    }
+
+    @Test
+    void testValidationWithQueryParameter_ShouldValidateAndReturnId() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/content/test-validation"), handlerCaptor.capture());
+
+        // Setup path parameters
+        String queryParams = "id=validId";
+        when(context.queryParams()).thenReturn(new QueryParameterManager(queryParams));
+
+        // When
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.OK, capturedResponse.getStatusCode());
+        assertEquals("validId", capturedResponse.getBody());
+    }
+
+    @Test
+    void testValidationWithQueryParameter_ShouldValidateInvalidInputAndReturnBadRequest() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture the route handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).get(eq("/api/content/test-validation"), handlerCaptor.capture());
+
+        // Setup path parameters
+        String queryParams = "id=ididididididididididididid";
+        when(context.queryParams()).thenReturn(new QueryParameterManager(queryParams));
+
+        // When
+        handlerCaptor.getValue().accept(context);
+
+        // Then
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertInstanceOf(ErrorResponse.class, capturedResponse.getBody());
+
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.BAD_REQUEST, error.getStatus());
+        assertNotNull(error.getMessage());
     }
 
 }

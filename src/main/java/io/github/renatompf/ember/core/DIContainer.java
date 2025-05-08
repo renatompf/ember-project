@@ -525,6 +525,9 @@ public class DIContainer {
                 logger.debug("Resolved parameter {} of method {}.{} to {}", i, controller.getClass().getName(), method.getName(), args[i]);
             }
 
+            // Validate parameters if any are annotated with @Validated
+            validateMethodParameters(controller, method, parameters, args);
+
             try {
                 Object result = method.invoke(controller, args);
                 logger.debug("Controller method {}.{} returned: {}", controller.getClass().getName(), method.getName(), result);
@@ -575,6 +578,34 @@ public class DIContainer {
                 .build();
     }
 
+    /**
+     * Validates method parameters using the `@Validated` annotation.
+     * This method checks for parameter-level constraints and validates beans annotated with `@Validated`.
+     *
+     * @param controller  The controller instance containing the method.
+     * @param method      The method to validate parameters for.
+     * @param parameters  The method parameters to validate.
+     * @param args        The arguments passed to the method.
+     * @throws ConstraintViolationException if any validation violations are found.
+     */
+    private void validateMethodParameters(Object controller, Method method, Parameter[] parameters, Object[] args) {
+        Validator validator = ValidationProvider.getValidator();
+        Set<ConstraintViolation<Object>> violations = new HashSet<>();
+
+        // Validate parameter-level constraints
+        violations.addAll(validator.forExecutables().validateParameters(controller, method, args));
+
+        // Additionally, validate beans annotated with @Validated
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].isAnnotationPresent(Validated.class) && args[i] != null) {
+                violations.addAll(validator.validate(args[i]));
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+    }
 
     /**
      * Resolves a method parameter based on its annotations and type.
@@ -611,22 +642,6 @@ public class DIContainer {
         if (parameter.isAnnotationPresent(RequestBody.class)) {
             Class<?> type = parameter.getType();
             result = context.body().parseBodyAs(type);
-        }
-
-        // Handle validation
-        if (parameter.isAnnotationPresent(Validated.class)) {
-            logger.debug("Validating parameter {}", parameter.getName());
-
-            if (result == null) {
-                throw new IllegalArgumentException("Missing required parameter: " + parameter.getName());
-            }
-
-            Validator validator = ValidationProvider.getValidator();
-
-            Set<ConstraintViolation<Object>> violations = validator.validate(result);
-            if (!violations.isEmpty()) {
-                throw new ConstraintViolationException(violations);
-            }
         }
 
         if (result == null) {
