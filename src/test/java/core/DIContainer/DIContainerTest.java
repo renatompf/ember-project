@@ -11,12 +11,15 @@ import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
 import io.github.renatompf.ember.annotations.parameters.PathParameter;
 import io.github.renatompf.ember.annotations.parameters.QueryParameter;
 import io.github.renatompf.ember.annotations.parameters.RequestBody;
+import io.github.renatompf.ember.annotations.parameters.Validated;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.core.*;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.enums.RequestHeader;
 import io.github.renatompf.ember.exceptions.HttpException;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1029,6 +1032,16 @@ class DIContainerTest {
         }
     }
 
+    public static class ValidateDto {
+        @NotBlank
+        @NotNull
+        private String value;
+
+        public String getValue() {
+            return value;
+        }
+    }
+
     @Controller("/api/exception")
     public static class TestExceptionController {
         @Get("/custom")
@@ -1062,7 +1075,19 @@ class DIContainerTest {
         @Consumes(MediaType.APPLICATION_JSON)
         @Produces(MediaType.APPLICATION_JSON)
         public void consumeAndProduce() {}
+
+        @Post("/test-validation")
+        public Response<String> testValidation(@Validated @RequestBody ValidateDto dto) {
+            return Response.ok().body(dto.getValue()).build();
+        }
+
+        @Post("/test-no-validation")
+        public Response<String> testNoValidation(@RequestBody ValidateDto dto) {
+            return Response.ok().body("Not Validate").build();
+        }
     }
+
+
 
     @Test
     void validateContentType_WithValidContentType_ShouldPass() throws NoSuchMethodException {
@@ -1144,6 +1169,94 @@ class DIContainerTest {
 
         // Verify that the response has the correct content type
         verify(headersManager).setHeader(RequestHeader.CONTENT_TYPE.getHeaderName(), MediaType.APPLICATION_JSON.getType());
+    }
+
+    @Test
+    void testValidation_WithValidDto_ShouldReturnOkResponse() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).post(eq("/api/content/test-validation"), handlerCaptor.capture());
+
+        // Setup valid DTO
+        ValidateDto validDto = new ValidateDto();
+        validDto.value = "Valid Value";
+        BodyManager bodyManager = mock(BodyManager.class);
+        when(context.body()).thenReturn(bodyManager);
+        when(bodyManager.parseBodyAs(ValidateDto.class)).thenReturn(validDto);
+
+        // Execute handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+        assertEquals("Valid Value", responseCaptor.getValue().getBody());
+        assertEquals(HttpStatusCode.OK, responseCaptor.getValue().getStatusCode());
+    }
+
+    @Test
+    void testValidation_WithInvalidDto_ShouldReturnBadRequest() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).post(eq("/api/content/test-validation"), handlerCaptor.capture());
+
+        // Setup invalid DTO
+        ValidateDto invalidDto = new ValidateDto(); // Missing required value
+        BodyManager bodyManager = mock(BodyManager.class);
+        when(context.body()).thenReturn(bodyManager);
+        when(bodyManager.parseBodyAs(ValidateDto.class)).thenReturn(invalidDto);
+
+        // Execute handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+
+        Response<?> capturedResponse = responseCaptor.getValue();
+        assertEquals(HttpStatusCode.BAD_REQUEST, capturedResponse.getStatusCode());
+        assertTrue(capturedResponse.getBody() instanceof ErrorResponse);
+
+        ErrorResponse error = (ErrorResponse) capturedResponse.getBody();
+        assertEquals(HttpStatusCode.BAD_REQUEST, error.getStatus());
+        assertNotNull(error.getMessage());
+    }
+
+    @Test
+    void testNoValidation_WithInvalidDto_ShouldReturnOkResponse() {
+        // Given
+        container.register(TestNegotiationContentController.class);
+        container.resolveAll();
+        container.mapControllerRoutes(app);
+
+        // Capture handler
+        ArgumentCaptor<Consumer<Context>> handlerCaptor = ArgumentCaptor.forClass(Consumer.class);
+        verify(app).post(eq("/api/content/test-no-validation"), handlerCaptor.capture());
+
+        // Setup invalid DTO
+        ValidateDto invalidDto = new ValidateDto(); // Missing required value
+        BodyManager bodyManager = mock(BodyManager.class);
+        when(context.body()).thenReturn(bodyManager);
+        when(bodyManager.parseBodyAs(ValidateDto.class)).thenReturn(invalidDto);
+
+        // Execute handler
+        handlerCaptor.getValue().accept(context);
+
+        // Verify response
+        ArgumentCaptor<Response<?>> responseCaptor = ArgumentCaptor.forClass(Response.class);
+        verify(responseHandler).handleResponse(responseCaptor.capture());
+        assertEquals("Not Validate", responseCaptor.getValue().getBody());
+        assertEquals(HttpStatusCode.OK, responseCaptor.getValue().getStatusCode());
     }
 
 }
