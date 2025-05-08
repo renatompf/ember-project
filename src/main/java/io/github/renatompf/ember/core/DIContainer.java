@@ -8,11 +8,15 @@ import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
 import io.github.renatompf.ember.annotations.parameters.PathParameter;
 import io.github.renatompf.ember.annotations.parameters.QueryParameter;
 import io.github.renatompf.ember.annotations.parameters.RequestBody;
+import io.github.renatompf.ember.annotations.parameters.Validated;
 import io.github.renatompf.ember.annotations.service.Service;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.enums.RequestHeader;
 import io.github.renatompf.ember.utils.TypeConverter;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -471,6 +475,17 @@ public class DIContainer {
             }
         }
 
+        if(e instanceof ConstraintViolationException){
+            ConstraintViolationException constraintViolationException = (ConstraintViolationException) e;
+            context.response().handleResponse(
+                    Response.status(HttpStatusCode.BAD_REQUEST)
+                            .body(new ErrorResponse(
+                                    HttpStatusCode.BAD_REQUEST,
+                            "")
+                            ).build());
+            return;
+        }
+
         // Default error handling if no specific handler is found
         logger.debug("No exception handler found, sending default error response");
         context.response().handleResponse(
@@ -510,6 +525,9 @@ public class DIContainer {
                 logger.debug("Resolved parameter {} of method {}.{} to {}", i, controller.getClass().getName(), method.getName(), args[i]);
             }
 
+            // Validate parameters if any are annotated with @Validated
+            validateMethodParameters(controller, method, parameters, args);
+
             try {
                 Object result = method.invoke(controller, args);
                 logger.debug("Controller method {}.{} returned: {}", controller.getClass().getName(), method.getName(), result);
@@ -519,6 +537,8 @@ public class DIContainer {
                 // Unwrap the actual exception thrown by the method
                 throw e.getCause();
             }
+        } catch (ConstraintViolationException e){
+            throw e;
         } catch (Throwable e) {
             logger.error("Failed to invoke controller method: {}.{} - {}", controller.getClass().getName(), method.getName(), e.getMessage());
             throw new RuntimeException("Failed to invoke controller method: " + method.getName(), e);
@@ -558,10 +578,39 @@ public class DIContainer {
                 .build();
     }
 
+    /**
+     * Validates method parameters using the `@Validated` annotation.
+     * This method checks for parameter-level constraints and validates beans annotated with `@Validated`.
+     *
+     * @param controller  The controller instance containing the method.
+     * @param method      The method to validate parameters for.
+     * @param parameters  The method parameters to validate.
+     * @param args        The arguments passed to the method.
+     * @throws ConstraintViolationException if any validation violations are found.
+     */
+    private void validateMethodParameters(Object controller, Method method, Parameter[] parameters, Object[] args) {
+        Validator validator = ValidationProvider.getValidator();
+        Set<ConstraintViolation<Object>> violations = new HashSet<>();
+
+        // Validate parameter-level constraints
+        violations.addAll(validator.forExecutables().validateParameters(controller, method, args));
+
+        // Additionally, validate beans annotated with @Validated
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].isAnnotationPresent(Validated.class) && args[i] != null) {
+                violations.addAll(validator.validate(args[i]));
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+    }
 
     /**
      * Resolves a method parameter based on its annotations and type.
-     * Supports resolving path parameters, query parameters, and the `Context` object.
+     * Supports resolving path parameters, query parameters, request body, and the `Context` object.
+     * Also checks for validation annotations and performs validation if necessary.
      *
      * @param parameter The method parameter to resolve.
      * @param context   The HTTP request context, which provides access to path and query parameters.
@@ -570,36 +619,36 @@ public class DIContainer {
     private Object resolveParameter(Parameter parameter, Context context) {
         logger.debug("Resolving parameter {} of type {}", parameter.getName(), parameter.getType().getName());
 
+        // Handle Context parameter first
+        if (parameter.getType().isAssignableFrom(Context.class)) {
+            return context;
+        }
+
+        Object result = null;
+
         // Handle path parameters
         PathParameter pathParam = parameter.getAnnotation(PathParameter.class);
         if (pathParam != null) {
-            logger.debug("Resolving path parameter {} for parameter {}", pathParam.value(), parameter.getName());
-            return resolvePathParameter(pathParam, parameter, context.pathParams().pathParams());
+            result = resolvePathParameter(pathParam, parameter, context.pathParams().pathParams());
         }
 
         // Handle query parameters
         QueryParameter queryParam = parameter.getAnnotation(QueryParameter.class);
         if (queryParam != null) {
-            logger.debug("Resolving query parameter {} for parameter {}", queryParam.value(), parameter.getName());
-            return resolveQueryParameter(queryParam, parameter, context.queryParams().queryParams());
+            result = resolveQueryParameter(queryParam, parameter, context.queryParams().queryParams());
         }
 
         // Handle request body
         if (parameter.isAnnotationPresent(RequestBody.class)) {
-            logger.debug("Resolving request body for parameter {}", parameter.getName());
             Class<?> type = parameter.getType();
-            return context.body().parseBodyAs(type);
+            result = context.body().parseBodyAs(type);
         }
 
-        // Handle Context parameter
-        if (parameter.getType().isAssignableFrom(Context.class)) {
-            return context;
+        if (result == null) {
+            logger.debug("Parameter {} of type {} is not supported", parameter.getName(), parameter.getType().getName());
         }
 
-        logger.debug("Parameter {} of type {} is not supported", parameter.getName(), parameter.getType().getName());
-
-        // Default to null for unsupported parameters
-        return null;
+        return result;
     }
 
     /**

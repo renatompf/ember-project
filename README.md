@@ -109,6 +109,7 @@ Access the secure endpoint at `http://localhost:8080/secure/data` and `http://lo
 - `@Handles`: Marks a method to handle a specific exception.
 - `@Consumes`: Specifies the content type that a method can consume.
 - `@Produces`: Specifies the content type that a method can produce.
+- `@Validated`: Marks an object for validation using [Jakarta Validation](https://beanvalidation.org/).
 
 ### Middleware
 Use `@WithMiddleware` to apply middleware globally or to specific routes.
