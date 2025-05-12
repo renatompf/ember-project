@@ -1,6 +1,6 @@
 import io.github.renatompf.ember.EmberApplication;
-import io.github.renatompf.ember.core.Context;
-import io.github.renatompf.ember.core.RouteMatchResult;
+import io.github.renatompf.ember.core.routing.RouteMatchResult;
+import io.github.renatompf.ember.core.server.Context;
 import io.github.renatompf.ember.enums.HttpMethod;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

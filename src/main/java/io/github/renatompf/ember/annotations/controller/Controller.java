@@ -20,5 +20,5 @@ public @interface Controller {
      *
      * @return The base path for the controller.
      */
-    String value() default ""; // The base path for the controller, default is an empty string
+    String value() default "/"; // The base path for the controller, default is an empty string
 }

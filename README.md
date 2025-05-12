@@ -23,12 +23,15 @@ flowchart TB
     B --> |registers| C[Router]
     B --> |manages| Services[Services]
     B --> |manages| Controllers[Controllers]
-    B -->|manages| Handlers[GlobalHandlers]
+    B --> |manages| Handlers[GlobalHandlers]
 
     E[Middleware] --> D
     C --> |provides| D
-    D --> F[Route Handlers]
-    F --> R[Response]
+    D --> P[ParameterResolver]
+    P --> F[Route Handler]
+    F --> V[ValidationManager]
+    V --> R[Response]
+    F --> R
     R --> RH[ResponseHandler]
     RH --> |serializes based on<br/>content type| J[Final Response]
     Handlers --> K[Exception Handling]
@@ -40,12 +43,14 @@ flowchart TB
     C --- Note3[Path + method to handler]
     G --- Note4[Starts and handles HttpServer]
     I --- Note5[Holds request state, response, etc.]
-    K --- Note6[Handles exceptions using @Handles methods]
-RH --- Note7[Handles content negotiation<br/>and serialization]
+    K --- Note6[Handles exceptions using Handles methods]
+    RH --- Note7[Handles content negotiation<br/>and serialization]
+    P --- Note8[Resolves method parameters<br/> body, query, path, etc. ]
+    V --- Note9[Validates request data<br/>using Jakarta Validation]
 
 %% Styling
 classDef note fill:#533,stroke:#533,stroke-width:2px
-class Note1,Note2,Note3,Note4,Note5,Note6,Note7 note
+class Note1,Note2,Note3,Note4,Note5,Note6,Note7,Note8,Note9 note
 ```
 
 
@@ -53,8 +58,8 @@ class Note1,Note2,Note3,Note4,Note5,Note6,Note7 note
 
 ```java
 import io.github.renatompf.ember.annotations.middleware.WithMiddleware;
-import io.github.renatompf.ember.core.Context;
-import io.github.renatompf.ember.core.Middleware;
+import io.github.renatompf.ember.core.server.Context;
+import io.github.renatompf.ember.core.server.Middleware;
 
 // Declare middleware for authentication
 public class AuthMiddleware implements Middleware {
