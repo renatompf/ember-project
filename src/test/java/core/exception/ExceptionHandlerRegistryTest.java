@@ -1,8 +1,12 @@
-package core;
+package core.exception;
 
 import io.github.renatompf.ember.annotations.exceptions.GlobalHandler;
 import io.github.renatompf.ember.annotations.exceptions.Handles;
-import io.github.renatompf.ember.core.*;
+import io.github.renatompf.ember.core.exception.ExceptionHandlerMethod;
+import io.github.renatompf.ember.core.exception.ExceptionHandlerRegistry;
+import io.github.renatompf.ember.core.http.ErrorResponse;
+import io.github.renatompf.ember.core.http.Response;
+import io.github.renatompf.ember.core.server.Context;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.exceptions.HttpException;
 import org.junit.jupiter.api.BeforeEach;

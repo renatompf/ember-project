@@ -1,6 +1,6 @@
-package core;
+package core.routing;
 
-import io.github.renatompf.ember.core.RoutePattern;
+import io.github.renatompf.ember.core.routing.RoutePattern;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -78,7 +78,7 @@ class RoutePatternTest {
     void shouldHandleRootPath() {
         RoutePattern pattern = new RoutePattern("/");
         assertFalse(pattern.matches("/something"));
-        assertFalse(pattern.matches("/"));
+        assertTrue(pattern.matches("/"));
         assertTrue(pattern.extractParameters("/").isEmpty());
     }
 

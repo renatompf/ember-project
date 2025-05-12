@@ -1,10 +1,10 @@
-package core;
+package core.http;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
-import io.github.renatompf.ember.core.Response;
-import io.github.renatompf.ember.core.ResponseHandler;
-import io.github.renatompf.ember.core.ResponseSerializer;
+import io.github.renatompf.ember.core.http.Response;
+import io.github.renatompf.ember.core.http.ResponseHandler;
+import io.github.renatompf.ember.core.http.ResponseSerializer;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.enums.RequestHeader;

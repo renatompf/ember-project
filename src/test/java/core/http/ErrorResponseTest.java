@@ -1,6 +1,6 @@
-package core;
+package core.http;
 
-import io.github.renatompf.ember.core.ErrorResponse;
+import io.github.renatompf.ember.core.http.ErrorResponse;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import org.junit.jupiter.api.Test;
 

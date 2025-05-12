@@ -1,10 +1,13 @@
-package core;
+package core.server;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import io.github.renatompf.ember.core.*;
+import io.github.renatompf.ember.core.http.Response;
+import io.github.renatompf.ember.core.routing.RouteMatchResult;
+import io.github.renatompf.ember.core.routing.Router;
+import io.github.renatompf.ember.core.server.*;
 import io.github.renatompf.ember.enums.HttpMethod;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.exceptions.HttpException;

@@ -1,9 +1,9 @@
-package core;
+package core.routing;
 
-import io.github.renatompf.ember.core.Context;
-import io.github.renatompf.ember.core.MiddlewareChain;
-import io.github.renatompf.ember.core.RouteMatchResult;
-import io.github.renatompf.ember.core.Router;
+import io.github.renatompf.ember.core.routing.RouteMatchResult;
+import io.github.renatompf.ember.core.routing.Router;
+import io.github.renatompf.ember.core.server.Context;
+import io.github.renatompf.ember.core.server.MiddlewareChain;
 import io.github.renatompf.ember.enums.HttpMethod;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
