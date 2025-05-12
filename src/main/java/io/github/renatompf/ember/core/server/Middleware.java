@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 /**
  * A functional interface representing a middleware component in the application.

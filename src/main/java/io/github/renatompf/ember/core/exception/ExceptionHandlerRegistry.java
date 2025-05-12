@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.exception;
 
 import io.github.renatompf.ember.annotations.exceptions.GlobalHandler;
 import io.github.renatompf.ember.annotations.exceptions.Handles;
@@ -32,11 +32,33 @@ public class ExceptionHandlerRegistry {
      * @throws IllegalArgumentException if the provided global handler is not annotated with {@code @GlobalHandler}.
      */
     public ExceptionHandlerRegistry(Object globalHandler) {
-        if (!globalHandler.getClass().isAnnotationPresent(GlobalHandler.class)) {
+        // Check for null before accessing methods on globalHandler
+        if (globalHandler != null && !globalHandler.getClass().isAnnotationPresent(GlobalHandler.class)) {
             throw new IllegalArgumentException("Class must be annotated with @GlobalHandler");
         }
         this.globalHandler = globalHandler;
-        registerHandlers();
+
+        // Only register handlers if we have a valid global handler
+        if (globalHandler != null) {
+            registerHandlers();
+        }
+    }
+
+    /**
+     * Registers all handlers found in this registry with the provided exception manager.
+     *
+     * @param manager The exception manager to register handlers with
+     */
+    public void registerHandlersWithManager(ExceptionManager manager) {
+        if (manager == null) {
+            return;
+        }
+
+        for (Map.Entry<Class<? extends Throwable>, ExceptionHandlerMethod> entry : this.handlers.entrySet()) {
+            manager.registerHandler(entry.getKey(), entry.getValue());
+        }
+
+        logger.debug("Registered {} exception handlers with manager", this.handlers.size());
     }
 
     /**

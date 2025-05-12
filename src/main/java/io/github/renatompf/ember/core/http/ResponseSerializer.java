@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.http;
 
 /**
  * Interface for serializing objects into a specific format.

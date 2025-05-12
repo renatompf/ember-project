@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 /**
  * A utility class that provides thread-local storage for the {@link Context} object.

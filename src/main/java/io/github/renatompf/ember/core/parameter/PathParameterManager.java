@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.parameter;
 
 import java.util.Map;
 import java.util.function.Function;

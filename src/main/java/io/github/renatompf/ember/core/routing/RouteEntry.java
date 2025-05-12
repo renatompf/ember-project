@@ -1,5 +1,6 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.routing;
 
+import io.github.renatompf.ember.core.server.MiddlewareChain;
 import io.github.renatompf.ember.enums.HttpMethod;
 
 import java.util.Objects;

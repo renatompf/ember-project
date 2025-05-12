@@ -1,4 +1,6 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.routing;
+
+import io.github.renatompf.ember.core.server.MiddlewareChain;
 
 import java.util.Map;
 

@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 import java.util.List;
 import java.util.function.Consumer;

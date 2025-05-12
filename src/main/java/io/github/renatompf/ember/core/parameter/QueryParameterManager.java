@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.parameter;
 
 import java.net.URLDecoder;
 import java.util.HashMap;

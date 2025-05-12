@@ -1,7 +1,8 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.parameter;
 
 import io.github.renatompf.ember.annotations.content.Consumes;
 import io.github.renatompf.ember.annotations.content.Produces;
+import io.github.renatompf.ember.core.server.Context;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.exceptions.HttpException;

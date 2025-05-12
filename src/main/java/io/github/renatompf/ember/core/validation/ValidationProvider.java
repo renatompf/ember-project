@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.validation;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

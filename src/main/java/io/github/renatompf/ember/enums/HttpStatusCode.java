@@ -192,7 +192,26 @@ public enum HttpStatusCode {
      * The server has encountered a situation it doesn't know how to handle.
      * </p>
      */
-    INTERNAL_SERVER_ERROR(500, "Internal Server Error");
+    INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
+
+    /**
+     * HTTP 501 Not Implemented.
+     * <p>
+     * The request method is not supported by the server and cannot be handled.
+     * </p>
+     */
+    NOT_IMPLEMENTED(501, "Not Implemented"),
+
+    /**
+     * HTTP 502 Bad Gateway.
+     * <p>
+     * The server, while acting as a gateway or proxy, received an invalid response from the upstream server.
+     * </p>
+     */
+    BAD_GATEWAY(502, "Bad Gateway"),
+
+    ;
+
 
     /**
      * The numerical HTTP status code.

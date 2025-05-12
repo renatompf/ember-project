@@ -1,4 +1,6 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.exception;
+
+import io.github.renatompf.ember.core.server.Context;
 
 import java.lang.reflect.Method;
 

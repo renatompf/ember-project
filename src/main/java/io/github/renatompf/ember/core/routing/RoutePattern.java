@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.routing;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +44,13 @@ public class RoutePattern {
     public RoutePattern(String rawPath) {
        this.parameterNames = new ArrayList<>();
        this.rawPath = rawPath;
+
+        String normalized = rawPath == null || rawPath.isEmpty() ? "/" : rawPath;
+        if (normalized.equals("/")) {
+            this.pattern = Pattern.compile("^/$");
+            return;
+        }
+
        String regex = Arrays.stream(rawPath.split("/"))
                .map(
                        segment -> {

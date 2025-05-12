@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 /**
  * Middleware that sets the {@link Context} for the current thread using {@link ContextHolder}.

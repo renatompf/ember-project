@@ -1,4 +1,4 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.http;
 
 import com.sun.net.httpserver.HttpExchange;
 
@@ -29,8 +29,8 @@ public class CookieManager {
         if (cookies != null) {
             for (String cookie : cookies.split(";")) {
                 String[] parts = cookie.trim().split("=", 2);
-                if (parts[0].equals(name)) {
-                    return parts.length > 1 ? parts[1] : "";
+                if (parts[0].trim().equals(name)) { // Add .trim() here
+                    return parts.length > 1 ? parts[1].trim() : ""; // And here for the value
                 }
             }
         }

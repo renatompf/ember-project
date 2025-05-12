@@ -1,6 +1,9 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 import com.sun.net.httpserver.HttpServer;
+import io.github.renatompf.ember.core.http.Response;
+import io.github.renatompf.ember.core.routing.RouteMatchResult;
+import io.github.renatompf.ember.core.routing.Router;
 import io.github.renatompf.ember.enums.HttpStatusCode;
 import io.github.renatompf.ember.enums.MediaType;
 import io.github.renatompf.ember.enums.RequestHeader;

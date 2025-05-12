@@ -1,6 +1,10 @@
 package io.github.renatompf.ember;
 
-import io.github.renatompf.ember.core.*;
+import io.github.renatompf.ember.core.di.DIContainer;
+import io.github.renatompf.ember.core.routing.Router;
+import io.github.renatompf.ember.core.server.Context;
+import io.github.renatompf.ember.core.server.Middleware;
+import io.github.renatompf.ember.core.server.Server;
 import io.github.renatompf.ember.enums.HttpMethod;
 
 import java.util.ArrayList;
@@ -139,25 +143,9 @@ public class EmberApplication {
      * @param port The port number to start the server on.
      */
     public void start(int port) {
-        // Register all services in the Dependency Injection (DI) container.
-        // This step ensures that all service classes are available for injection.
-        diContainer.registerServices();
-
-        // Register all controllers in the DI container.
-        // Controllers are responsible for handling HTTP requests and defining routes.
-        diContainer.registerControllers();
-
-        // Register all global handlers in the DI container
-        // Global handlers are used to handle exceptions and other cross-cutting concerns.
-        diContainer.registerGlobalHandlers();
-
-        // Resolve all services to ensure they are instantiated and their dependencies are satisfied.
-        // This step validates the DI container's configuration.
-        diContainer.resolveAll();
-
-        // Register all handlers in the DI container.
-        // Handlers are used to process specific types of requests or exceptions.
-        diContainer.registerExceptionHandlers();
+        // Initialize the DI container
+        // This step discovers all services, controllers, and handlers and resolves their dependencies
+        diContainer.init();
 
         // Map all routes defined in the controllers to the router.
         // This step binds the routes to their respective handlers in the application.

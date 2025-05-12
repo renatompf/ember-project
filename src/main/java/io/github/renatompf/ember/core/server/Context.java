@@ -1,6 +1,13 @@
-package io.github.renatompf.ember.core;
+package io.github.renatompf.ember.core.server;
 
 import com.sun.net.httpserver.HttpExchange;
+import io.github.renatompf.ember.core.http.CookieManager;
+import io.github.renatompf.ember.core.http.HeadersManager;
+import io.github.renatompf.ember.core.http.ResponseHandler;
+import io.github.renatompf.ember.core.http.SessionManager;
+import io.github.renatompf.ember.core.parameter.BodyManager;
+import io.github.renatompf.ember.core.parameter.PathParameterManager;
+import io.github.renatompf.ember.core.parameter.QueryParameterManager;
 import io.github.renatompf.ember.enums.HttpMethod;
 
 import java.util.List;
@@ -104,7 +111,7 @@ public class Context {
      *
      * @param middlewareChain The list of middleware to execute.
      */
-    void setMiddlewareChain(List<Middleware> middlewareChain) {
+    public void setMiddlewareChain(List<Middleware> middlewareChain) {
         this.middlewareChain = middlewareChain;
         this.middlewareIndex = -1;
     }

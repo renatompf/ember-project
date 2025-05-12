@@ -1,6 +1,6 @@
 package io.github.renatompf.ember.annotations.middleware;
 
-import io.github.renatompf.ember.core.Middleware;
+import io.github.renatompf.ember.core.server.Middleware;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
